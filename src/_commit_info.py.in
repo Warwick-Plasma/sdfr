@@ -1,0 +1,2 @@
+__commit_date__ = "@COMMIT_DATE@"
+__commit_id__ = "@COMMIT_ID@"

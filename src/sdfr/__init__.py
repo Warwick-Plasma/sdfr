@@ -19,23 +19,24 @@ _module_name = "sdfr"
 
 from .SDF import read
 from .sdf_helper import *
+from ._commit_info import (
+    __commit_date__,
+    __commit_id__,
+)
 from .loadlib import (
     __library_commit_date__,
     __library_commit_id__,
-    #__build_date__,
 )
 
 from importlib.metadata import version, PackageNotFoundError
 
-try:
-    __version__ = version(_module_name)
-except PackageNotFoundError:
-    __version__ = "2.6.12"
+__version__ = version(_module_name)
 
 __all__ = [
     "SDF",
     "__library_commit_date__",
     "__library_commit_id__",
     "__version__",
-    #"__build_date__",
+    "__commit_date__",
+    "__commit_id__",
 ]
