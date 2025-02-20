@@ -348,6 +348,8 @@ class BlockList:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
                 newblock = BlockConstant(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
+                newblock = BlockData(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
                 newblock = BlockLagrangianMesh(block)
                 meshes.append(newblock)
@@ -636,6 +638,41 @@ class BlockArray(Block):
             array = self._numpy_from_buffer(self._contents.data, blen)
             self._data = array.reshape(self.dims, order='F')
         return self._data
+
+
+class BlockData(Block):
+    """Data block"""
+    def __init__(self, block):
+        super().__init__(block)
+        self._checksum = block.checksum.decode()
+        self._checksum_type = block.checksum_type.decode()
+        self._mimetype = block.mimetype.decode()
+
+    @property
+    def data(self):
+        """Block data contents"""
+        if self._data is None:
+            clib = self._handle._clib
+            clib.sdf_helper_read_data(self._handle, self._contents)
+            blen = self._contents.data_length
+            _data = ct.cast(self._contents.data, ct.POINTER(ct.c_char * blen))
+            self._data = _data.contents[:]
+        return self._data
+
+    @property
+    def checksum(self):
+        """Block data checksum"""
+        return self._checksum
+
+    @property
+    def checksum_type(self):
+        """Block data checksum type"""
+        return self._checksum_type
+
+    @property
+    def mimetype(self):
+        """mimetype for Block data contents"""
+        return self._mimetype
 
 
 def get_header(h):
