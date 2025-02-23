@@ -450,7 +450,7 @@ class Block:
 
 
 class BlockConstant(Block):
-    """Constant block class"""
+    """Constant block"""
     def __init__(self, block):
         super().__init__(block)
         offset = getattr(SdfBlock, 'const_value').offset
@@ -460,6 +460,7 @@ class BlockConstant(Block):
 
 
 class BlockPlainVariable(Block):
+    """Plain variable block"""
     @property
     def data(self):
         """Block data contents"""
@@ -500,6 +501,7 @@ class BlockPlainVariable(Block):
 
 
 class BlockPlainMesh(Block):
+    """Plain mesh block"""
     def __init__(self, block):
         super().__init__(block)
         self._data = None
@@ -552,6 +554,7 @@ class BlockPlainMesh(Block):
 
 
 class BlockPointMesh(BlockPlainMesh):
+    """Point mesh block"""
     @property
     def species_id(self):
         """Species ID"""
@@ -559,6 +562,7 @@ class BlockPointMesh(BlockPlainMesh):
 
 
 class BlockPointVariable(BlockPlainVariable):
+    """Point variable block"""
     @property
     def species_id(self):
         """Species ID"""
@@ -566,6 +570,7 @@ class BlockPointVariable(BlockPlainVariable):
 
 
 class BlockNameValue(Block):
+    """Name/value block"""
     def __init__(self, block):
         super().__init__(block)
         self._dims = (block.ndims,)
@@ -585,6 +590,7 @@ class BlockNameValue(Block):
 
 
 class BlockArray(Block):
+    """Array block"""
     @property
     def data(self):
         """Block data contents"""
