@@ -338,6 +338,7 @@ class BlockList:
         meshes = []
         mesh_vars = []
         self._block_ids = {}
+        self._block_names = {}
         for n in range(h.contents.nblocks):
             block = block.contents
             block._handle = h
@@ -397,6 +398,7 @@ class BlockList:
             if newblock is not None:
                 self.__dict__[name] = newblock
                 self._block_ids.update({block.id.decode() : newblock})
+                self._block_names.update({block.name.decode() : newblock})
             block = block.next
 
         for var in mesh_vars:
@@ -411,6 +413,16 @@ class BlockList:
         self._clib.sdf_close.argtypes = [ct.c_void_p]
         self._clib.sdf_stack_destroy(self._handle)
         self._clib.sdf_close(self._handle)
+
+    @property
+    def name_dict(self):
+        """Dictionary of blocks using name field as key"""
+        return self._block_names
+
+    @property
+    def id_dict(self):
+        """Dictionary of blocks using id field as key"""
+        return self._block_ids
 
 
 class Block:
@@ -773,7 +785,7 @@ def get_member_name(name):
                     or (i >= "0" and i <= "9")) else "_" \
                     for i in sname])
 
-def read(filename, convert=False, mmap=0, derived=True):
+def read(filename, convert=False, mmap=0, dict=False, derived=True):
     """Reads the SDF data and returns a dictionary of NumPy arrays.
 
     Parameters
@@ -782,6 +794,8 @@ def read(filename, convert=False, mmap=0, derived=True):
         The name of the SDF file to open.
     convert : bool, optional
         Convert double precision data to single when reading file.
+    dict : bool, optional
+        Return file contents as a dictionary rather than member names.
     derived : bool, optional
         Include derived variables in the data structure.
     """
@@ -791,4 +805,12 @@ def read(filename, convert=False, mmap=0, derived=True):
     if mmap != 0:
         warnings.warn("mmap flag ignored")
 
-    return BlockList(filename, convert, derived)
+    blocklist = BlockList(filename, convert, derived)
+
+    if isinstance(dict, str):
+        if dict == "id" or dict == "ids":
+            return blocklist._block_ids
+    elif isinstance(dict, bool) and dict:
+        return blocklist._block_names
+
+    return blocklist
