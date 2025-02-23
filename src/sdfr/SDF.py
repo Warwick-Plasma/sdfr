@@ -350,13 +350,15 @@ class BlockList:
                 newblock = BlockConstant(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE:
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_DERIVED \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE:
                 newblock = BlockPlainVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
                 newblock = BlockPlainMesh(block)
                 meshes.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
                 newblock = BlockPointVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
