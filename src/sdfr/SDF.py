@@ -310,10 +310,8 @@ class BlockList:
         clib = sdf_lib
         self._clib = clib
         clib.sdf_open.restype = ct.POINTER(SdfFile)
-        #clib.sdf_open.restype = ct.c_void_p
         clib.sdf_open.argtypes = [ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
         clib.sdf_stack_init.argtypes = [ct.c_void_p]
-        #clib.sdf_read_blocklist.argtypes = [ct.POINTER(SdfFile)]
         clib.sdf_read_blocklist.argtypes = [ct.c_void_p]
         clib.sdf_read_blocklist_all.argtypes = [ct.c_void_p]
         clib.sdf_helper_read_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
@@ -342,29 +340,34 @@ class BlockList:
             block = block.contents
             block._handle = h
             blocktype = block.blocktype
+            newblock = None
             name = get_member_name(block.name)
             if blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
                 self.Run_info = get_run_info(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
-                self.__dict__[name] = BlockConstant(block)
+                newblock = BlockConstant(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE:
-                self.__dict__[name] = BlockPlainVariable(block)
-                mesh_vars.append(self.__dict__[name])
+                newblock = BlockPlainVariable(block)
+                mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
-                self.__dict__[name] = BlockPointVariable(block)
-                mesh_vars.append(self.__dict__[name])
+                newblock = BlockPointVariable(block)
+                mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
-                self.__dict__[name] = BlockPlainMesh(block)
-                meshes.append(self.__dict__[name])
+                newblock = BlockPlainMesh(block)
+                meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
-                self.__dict__[name] = BlockPointMesh(block)
-                meshes.append(self.__dict__[name])
+                newblock = BlockPointMesh(block)
+                meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
-                self.__dict__[name] = BlockNameValue(block)
+                newblock = BlockNameValue(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_ARRAY:
-                self.__dict__[name] = BlockArray(block)
-            #else:
-            #    print(name,SdfBlockType(blocktype).name)
+                newblock = BlockArray(block)
+            else:
+                # Block not supported
+                # print(name,SdfBlockType(blocktype).name)
+                pass
+            if newblock is not None:
+                self.__dict__[name] = newblock
             block = block.next
 
         for var in mesh_vars:
@@ -395,6 +398,7 @@ class Block:
         self._dims = tuple(block.dims[:block.ndims])
         self._contents = block
         self._owndata = True
+        self._data = None
 
     def __del__(self):
         if not self._owndata and self._data is not None:
@@ -456,10 +460,6 @@ class BlockConstant(Block):
 
 
 class BlockPlainVariable(Block):
-    def __init__(self, block):
-        super().__init__(block)
-        self._data = None
-
     @property
     def data(self):
         """Block data contents"""
@@ -508,7 +508,8 @@ class BlockPlainMesh(Block):
         self._mult = None
         if bool(block.dim_mults):
             self._mult = tuple(block.dim_mults[:block.ndims])
-        self._extents = tuple(block.extents[:2*block.ndims])
+        if bool(block.extents):
+            self._extents = tuple(block.extents[:2*block.ndims])
 
     @property
     def data(self):
@@ -551,9 +552,6 @@ class BlockPlainMesh(Block):
 
 
 class BlockPointMesh(BlockPlainMesh):
-    def __init__(self, block):
-        super().__init__(block)
-
     @property
     def species_id(self):
         """Species ID"""
@@ -561,9 +559,6 @@ class BlockPointMesh(BlockPlainMesh):
 
 
 class BlockPointVariable(BlockPlainVariable):
-    def __init__(self, block):
-        super().__init__(block)
-
     @property
     def species_id(self):
         """Species ID"""
@@ -590,10 +585,6 @@ class BlockNameValue(Block):
 
 
 class BlockArray(Block):
-    def __init__(self, block):
-        super().__init__(block)
-        self._data = None
-
     @property
     def data(self):
         """Block data contents"""
@@ -610,17 +601,18 @@ class BlockArray(Block):
 
 def get_run_info(block):
     from datetime import datetime
-    r = ct.cast(block.data, ct.POINTER(RunInfo)).contents
-    ri = {}
-    ri['version'] = f"{r.version}.{r.revision}.{r.minor_rev}"
-    ri['commit_id'] = r.commit_id.decode()
-    ri['sha1sum'] = r.sha1sum.decode()
-    ri['compile_machine'] = r.compile_machine.decode()
-    ri['compile_flags'] = r.compile_flags.decode()
-    ri['compile_date'] = datetime.utcfromtimestamp(r.compile_date).strftime('%c')
-    ri['run_date'] = datetime.utcfromtimestamp(r.run_date).strftime('%c')
-    ri['io_data'] = datetime.utcfromtimestamp(r.io_date).strftime('%c')
-    return ri
+    h = ct.cast(block.data, ct.POINTER(RunInfo)).contents
+    d = {}
+    d['version'] = f"{h.version}.{h.revision}.{h.minor_rev}"
+    d['commit_id'] = h.commit_id.decode()
+    d['sha1sum'] = h.sha1sum.decode()
+    d['compile_machine'] = h.compile_machine.decode()
+    d['compile_flags'] = h.compile_flags.decode()
+    d['compile_date'] = datetime.utcfromtimestamp(h.compile_date).strftime('%c')
+    d['run_date'] = datetime.utcfromtimestamp(h.run_date).strftime('%c')
+    d['io_data'] = datetime.utcfromtimestamp(h.io_date).strftime('%c')
+    return d
+
 
 def get_member_name(name):
     sname = name.decode()
@@ -628,7 +620,7 @@ def get_member_name(name):
                     or (i >= "0" and i <= "9")) else "_" \
                     for i in sname])
 
-def read(filename, convert=False, derived=True):
+def read(filename, convert=False, mmap=0, derived=True):
     """Reads the SDF data and returns a dictionary of NumPy arrays.
 
     Parameters
@@ -640,5 +632,10 @@ def read(filename, convert=False, derived=True):
     derived : bool, optional
         Include derived variables in the data structure.
     """
+
+    import warnings
+
+    if mmap != 0:
+        warnings.warn("mmap flag ignored")
 
     return BlockList(filename, convert, derived)

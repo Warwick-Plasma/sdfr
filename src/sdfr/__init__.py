@@ -17,8 +17,8 @@
 
 _module_name = "sdfr"
 
-from .SDF import read
-from .sdf_helper import *
+from .SDF import *
+from . import sdf_helper
 from ._commit_info import (
     __commit_date__,
     __commit_id__,
