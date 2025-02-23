@@ -340,6 +340,7 @@ class BlockList:
         for n in range(h.contents.nblocks):
             block = block.contents
             block._handle = h
+            block._blocklist = self
             blocktype = block.blocktype
             newblock = None
             name = get_member_name(block.name)
@@ -399,6 +400,7 @@ class Block:
         self._dims = tuple(block.dims[:block.ndims])
         self._contents = block
         self._owndata = True
+        self._blocklist = block._blocklist
         self._data = None
 
     def __del__(self):
@@ -417,6 +419,11 @@ class Block:
         buf = buffer_from_memory(cast, blen)
         self._owndata = False
         return np.frombuffer(buf, dtype)
+
+    @property
+    def blocklist(self):
+        """Blocklist"""
+        return self._blocklist
 
     @property
     def data(self):
