@@ -344,26 +344,26 @@ class BlockList:
             blocktype = block.blocktype
             newblock = None
             name = get_member_name(block.name)
-            if blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
-                self.Run_info = get_run_info(block)
+            if blocktype == SdfBlockType.SDF_BLOCKTYPE_ARRAY:
+                newblock = BlockArray(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
                 newblock = BlockConstant(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
+                newblock = BlockNameValue(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE:
                 newblock = BlockPlainVariable(block)
-                mesh_vars.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
-                newblock = BlockPointVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
                 newblock = BlockPlainMesh(block)
                 meshes.append(newblock)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
+                newblock = BlockPointVariable(block)
+                mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
                 newblock = BlockPointMesh(block)
                 meshes.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
-                newblock = BlockNameValue(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_ARRAY:
-                newblock = BlockArray(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
+                self.Run_info = get_run_info(block)
             else:
                 # Block not supported
                 # print(name,SdfBlockType(blocktype).name)
