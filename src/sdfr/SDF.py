@@ -348,6 +348,9 @@ class BlockList:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
                 newblock = BlockConstant(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
+                newblock = BlockLagrangianMesh(block)
+                meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_DERIVED \
@@ -561,6 +564,26 @@ class BlockPlainMesh(Block):
     def units(self):
         """Units of variable"""
         return self._units
+
+
+class BlockLagrangianMesh(BlockPlainMesh):
+    """Lagrangian mesh block"""
+    @property
+    def data(self):
+        """Block data contents"""
+        if self._data is None:
+            clib = self._handle._clib
+            clib.sdf_helper_read_data(self._handle, self._contents)
+            blen = np.dtype(self._datatype).itemsize
+            for d in self.dims:
+                blen *= d
+            grids = []
+            for i, d in enumerate(self.dims):
+                array = self._numpy_from_buffer(self._contents.grids[i], blen)
+                array = array.reshape(self.dims, order='F')
+                grids.append(array)
+            self._data = tuple(grids)
+        return self._data
 
 
 class BlockPointMesh(BlockPlainMesh):
