@@ -355,6 +355,18 @@ class BlockList:
                     newblock = BlockStitchedPath(block)
                 else:
                     newblock = BlockStitched(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATERIAL \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATERIAL:
+                newblock = BlockStitchedMaterial(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATVAR \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATVAR:
+                newblock = BlockStitchedMatvar(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_SPECIES \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_SPECIES:
+                newblock = BlockStitchedSpecies(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_TENSOR \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_TENSOR:
+                newblock = BlockStitchedTensor(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
                 newblock = BlockData(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
@@ -700,6 +712,26 @@ class BlockStitched(Block):
 
 class BlockStitchedPath(BlockStitched):
     """Stitched path block"""
+    pass
+
+
+class BlockStitchedMaterial(BlockStitched):
+    """Stitched material block"""
+    pass
+
+
+class BlockStitchedMatvar(BlockStitched):
+    """Stitched material variable block"""
+    pass
+
+
+class BlockStitchedSpecies(BlockStitched):
+    """Stitched species block"""
+    pass
+
+
+class BlockStitchedTensor(BlockStitched):
+    """Stitched tensor block"""
     pass
 
 
