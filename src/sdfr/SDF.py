@@ -334,6 +334,7 @@ class BlockList:
 
 
         block = h.contents.blocklist
+        self.Header = get_header(h.contents)
         meshes = []
         mesh_vars = []
         for n in range(h.contents.nblocks):
@@ -603,6 +604,23 @@ class BlockArray(Block):
             array = self._numpy_from_buffer(self._contents.data, blen)
             self._data = array.reshape(self.dims, order='F')
         return self._data
+
+
+def get_header(h):
+    d = {}
+    d['filename'] = h.filename.decode()
+    d['file_version'] = h.file_version
+    d['file_revision'] = h.file_revision
+    d['code_name'] = h.code_name.decode()
+    d['step'] = h.step
+    d['time'] = h.time
+    d['jobid1'] = h.jobid1
+    d['jobid2'] = h.jobid2
+    d['code_io_version'] = h.code_io_version
+    d['restart_flag'] = h.restart_flag
+    d['other_domains'] = h.other_domains
+    d['station_file'] = h.station_file
+    return d
 
 
 def get_run_info(block):
