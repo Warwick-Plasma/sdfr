@@ -337,6 +337,7 @@ class BlockList:
         self.Header = get_header(h.contents)
         meshes = []
         mesh_vars = []
+        self._block_ids = {}
         for n in range(h.contents.nblocks):
             block = block.contents
             block._handle = h
@@ -348,6 +349,12 @@ class BlockList:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
                 newblock = BlockConstant(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS \
+              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED:
+                if block.stagger == 10 or block.stagger == 12:
+                    newblock = BlockStitchedPath(block)
+                else:
+                    newblock = BlockStitched(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
                 newblock = BlockData(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
@@ -377,6 +384,7 @@ class BlockList:
                 pass
             if newblock is not None:
                 self.__dict__[name] = newblock
+                self._block_ids.update({block.id.decode() : newblock})
             block = block.next
 
         for var in mesh_vars:
@@ -673,6 +681,26 @@ class BlockData(Block):
     def mimetype(self):
         """mimetype for Block data contents"""
         return self._mimetype
+
+
+class BlockStitched(Block):
+    """Stitched block"""
+    @property
+    def data(self):
+        """Block data contents"""
+        if self._data is None:
+            self._data = []
+            for i in range(self._contents.ndims):
+                vid = self._contents.variable_ids[i]
+                if len(vid) > 0:
+                    vid = vid.decode()
+                    self._data.append(self._blocklist._block_ids[vid])
+        return self._data
+
+
+class BlockStitchedPath(BlockStitched):
+    """Stitched path block"""
+    pass
 
 
 def get_header(h):
