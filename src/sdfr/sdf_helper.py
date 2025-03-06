@@ -26,7 +26,7 @@ except:
     import __builtin__ as builtins
 
 try:
-    import sdf
+    import sdfr as sdf
     got_sdf = True
 except ImportError:
     got_sdf = False
