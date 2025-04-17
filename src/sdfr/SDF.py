@@ -20,11 +20,11 @@ import numpy as np
 from enum import IntEnum
 from .loadlib import sdf_lib
 
-#try:
+# try:
 #    import xarray as xr
 #
 #    got_xarray = True
-#except ImportError:
+# except ImportError:
 #    print("WARNING: xarray not installed. Generating plain numpy arrays.")
 #    got_xarray = False
 
@@ -63,11 +63,13 @@ class SdfBlockType(IntEnum):
     SDF_BLOCKTYPE_DATABLOCK = 28
     SDF_BLOCKTYPE_NAMEVALUE = 29
 
+
 class SdfGeometry(IntEnum):
     SDF_GEOMETRY_NULL = 0
     SDF_GEOMETRY_CARTESIAN = 1
     SDF_GEOMETRY_CYLINDRICAL = 2
     SDF_GEOMETRY_SPHERICAL = 3
+
 
 class SdfStagger(IntEnum):
     SDF_STAGGER_CELL_CENTRE = 0
@@ -78,6 +80,7 @@ class SdfStagger(IntEnum):
     SDF_STAGGER_EDGE_Y = 5
     SDF_STAGGER_EDGE_Z = 6
     SDF_STAGGER_VERTEX = 7
+
 
 class SdfDataType(IntEnum):
     SDF_DATATYPE_NULL = 0
@@ -90,21 +93,44 @@ class SdfDataType(IntEnum):
     SDF_DATATYPE_LOGICAL = 7
     SDF_DATATYPE_OTHER = 8
 
-_np_datatypes = [0, np.int32, np.int64, np.float32, np.float64, \
-                 np.longdouble, np.byte, np.int32, bool, 0]
-_ct_datatypes = [0, ct.c_int32, ct.c_int64, ct.c_float, ct.c_double, \
-                 ct.c_longdouble, ct.c_char, ct.c_bool, 0]
+
+_np_datatypes = [
+    0,
+    np.int32,
+    np.int64,
+    np.float32,
+    np.float64,
+    np.longdouble,
+    np.byte,
+    np.int32,
+    bool,
+    0,
+]
+_ct_datatypes = [
+    0,
+    ct.c_int32,
+    ct.c_int64,
+    ct.c_float,
+    ct.c_double,
+    ct.c_longdouble,
+    ct.c_char,
+    ct.c_bool,
+    0,
+]
 
 # Constants
 SDF_READ = 1
 SDF_WRITE = 2
 SDF_MAXDIMS = 4
 
+
 class SdfBlock(ct.Structure):
     pass  # Forward declaration for self-referencing structure
 
+
 class SdfFile(ct.Structure):
     pass  # Forward declaration for function pointer compatibility
+
 
 SdfBlock._fields_ = [
     ("extents", ct.POINTER(ct.c_double)),
@@ -198,7 +224,12 @@ SdfBlock._fields_ = [
     ("prev", ct.POINTER(SdfBlock)),
     ("subblock", ct.POINTER(SdfBlock)),
     ("subblock2", ct.POINTER(SdfBlock)),
-    ("populate_data", ct.CFUNCTYPE(ct.POINTER(SdfBlock), ct.POINTER(SdfFile), ct.POINTER(SdfBlock))),
+    (
+        "populate_data",
+        ct.CFUNCTYPE(
+            ct.POINTER(SdfBlock), ct.POINTER(SdfFile), ct.POINTER(SdfBlock)
+        ),
+    ),
     ("cpu_split", ct.c_int * SDF_MAXDIMS),
     ("starts", ct.c_int * SDF_MAXDIMS),
     ("proc_min", ct.c_int * 3),
@@ -285,8 +316,9 @@ SdfFile._fields_ = [
     ("fd", ct.c_int),
     ("purge_duplicated_ids", ct.c_int),
     ("internal_ghost_cells", ct.c_int),
-    ("ignore_nblocks", ct.c_int)
+    ("ignore_nblocks", ct.c_int),
 ]
+
 
 class RunInfo(ct.Structure):
     _fields_ = [
@@ -306,6 +338,7 @@ class RunInfo(ct.Structure):
 
 class BlockList:
     """Contains all the blocks"""
+
     def __init__(self, filename, convert=False, derived=True):
         clib = sdf_lib
         self._clib = clib
@@ -332,7 +365,6 @@ class BlockList:
         else:
             clib.sdf_read_blocklist(h)
 
-
         block = h.contents.blocklist
         self.Header = get_header(h.contents)
         meshes = []
@@ -350,23 +382,33 @@ class BlockList:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
                 newblock = BlockConstant(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED
+            ):
                 if block.stagger == 10 or block.stagger == 12:
                     newblock = BlockStitchedPath(block)
                 else:
                     newblock = BlockStitched(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATERIAL \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATERIAL:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATERIAL
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATERIAL
+            ):
                 newblock = BlockStitchedMaterial(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATVAR \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATVAR:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATVAR
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATVAR
+            ):
                 newblock = BlockStitchedMatvar(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_SPECIES \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_SPECIES:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_SPECIES
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_SPECIES
+            ):
                 newblock = BlockStitchedSpecies(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_TENSOR \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_TENSOR:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_TENSOR
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_TENSOR
+            ):
                 newblock = BlockStitchedTensor(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
                 newblock = BlockData(block)
@@ -375,15 +417,19 @@ class BlockList:
                 meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_DERIVED \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_DERIVED
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE
+            ):
                 newblock = BlockPlainVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
                 newblock = BlockPlainMesh(block)
                 meshes.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED \
-              or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE:
+            elif (
+                blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
+                or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE
+            ):
                 newblock = BlockPointVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
@@ -397,8 +443,8 @@ class BlockList:
                 pass
             if newblock is not None:
                 self.__dict__[name] = newblock
-                self._block_ids.update({block.id.decode() : newblock})
-                self._block_names.update({block.name.decode() : newblock})
+                self._block_ids.update({block.id.decode(): newblock})
+                self._block_names.update({block.name.decode(): newblock})
             block = block.next
 
         for var in mesh_vars:
@@ -430,13 +476,14 @@ class Block:
     Contains the data and metadata for a single
     block from an SDF file.
     """
+
     def __init__(self, block):
         self._handle = block._handle
         self._id = block.id.decode()
         self._name = block.name.decode()
         self._datatype = _np_datatypes[block.datatype_out]
         self._data_length = block.data_length
-        self._dims = tuple(block.dims[:block.ndims])
+        self._dims = tuple(block.dims[: block.ndims])
         self._contents = block
         self._owndata = True
         self._blocklist = block._blocklist
@@ -452,7 +499,7 @@ class Block:
         buffer_from_memory.restype = ct.py_object
         dtype = self._datatype
         if dtype == np.byte:
-            dtype = np.dtype('|S1')
+            dtype = np.dtype("|S1")
         totype = _ct_datatypes[self._contents.datatype]
         cast = ct.cast(data, ct.POINTER(totype))
         buf = buffer_from_memory(cast, blen)
@@ -495,12 +542,12 @@ class Block:
         return self._name
 
 
-
 class BlockConstant(Block):
     """Constant block"""
+
     def __init__(self, block):
         super().__init__(block)
-        offset = getattr(SdfBlock, 'const_value').offset
+        offset = getattr(SdfBlock, "const_value").offset
         self._datatype = _np_datatypes[block.datatype]
         totype = _ct_datatypes[block.datatype]
         self._data = totype.from_buffer(block, offset).value
@@ -508,6 +555,7 @@ class BlockConstant(Block):
 
 class BlockPlainVariable(Block):
     """Plain variable block"""
+
     @property
     def data(self):
         """Block data contents"""
@@ -518,7 +566,7 @@ class BlockPlainVariable(Block):
             for d in self.dims:
                 blen *= d
             array = self._numpy_from_buffer(self._contents.data, blen)
-            self._data = array.reshape(self.dims, order='F')
+            self._data = array.reshape(self.dims, order="F")
         return self._data
 
     @property
@@ -549,16 +597,21 @@ class BlockPlainVariable(Block):
 
 class BlockPlainMesh(Block):
     """Plain mesh block"""
+
     def __init__(self, block):
         super().__init__(block)
         self._data = None
-        self._units = tuple([block.dim_units[i].decode() for i in range(block.ndims)])
-        self._labels = tuple([block.dim_labels[i].decode() for i in range(block.ndims)])
+        self._units = tuple(
+            [block.dim_units[i].decode() for i in range(block.ndims)]
+        )
+        self._labels = tuple(
+            [block.dim_labels[i].decode() for i in range(block.ndims)]
+        )
         self._mult = None
         if bool(block.dim_mults):
-            self._mult = tuple(block.dim_mults[:block.ndims])
+            self._mult = tuple(block.dim_mults[: block.ndims])
         if bool(block.extents):
-            self._extents = tuple(block.extents[:2*block.ndims])
+            self._extents = tuple(block.extents[: 2 * block.ndims])
 
     @property
     def data(self):
@@ -602,6 +655,7 @@ class BlockPlainMesh(Block):
 
 class BlockLagrangianMesh(BlockPlainMesh):
     """Lagrangian mesh block"""
+
     @property
     def data(self):
         """Block data contents"""
@@ -614,7 +668,7 @@ class BlockLagrangianMesh(BlockPlainMesh):
             grids = []
             for i, d in enumerate(self.dims):
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
-                array = array.reshape(self.dims, order='F')
+                array = array.reshape(self.dims, order="F")
                 grids.append(array)
             self._data = tuple(grids)
         return self._data
@@ -622,6 +676,7 @@ class BlockLagrangianMesh(BlockPlainMesh):
 
 class BlockPointMesh(BlockPlainMesh):
     """Point mesh block"""
+
     @property
     def species_id(self):
         """Species ID"""
@@ -630,6 +685,7 @@ class BlockPointMesh(BlockPlainMesh):
 
 class BlockPointVariable(BlockPlainVariable):
     """Point variable block"""
+
     @property
     def species_id(self):
         """Species ID"""
@@ -638,6 +694,7 @@ class BlockPointVariable(BlockPlainVariable):
 
 class BlockNameValue(Block):
     """Name/value block"""
+
     def __init__(self, block):
         super().__init__(block)
         self._dims = (block.ndims,)
@@ -658,6 +715,7 @@ class BlockNameValue(Block):
 
 class BlockArray(Block):
     """Array block"""
+
     @property
     def data(self):
         """Block data contents"""
@@ -668,12 +726,13 @@ class BlockArray(Block):
             for d in self.dims:
                 blen *= d
             array = self._numpy_from_buffer(self._contents.data, blen)
-            self._data = array.reshape(self.dims, order='F')
+            self._data = array.reshape(self.dims, order="F")
         return self._data
 
 
 class BlockData(Block):
     """Data block"""
+
     def __init__(self, block):
         super().__init__(block)
         self._checksum = block.checksum.decode()
@@ -709,6 +768,7 @@ class BlockData(Block):
 
 class BlockStitched(Block):
     """Stitched block"""
+
     @property
     def data(self):
         """Block data contents"""
@@ -724,66 +784,84 @@ class BlockStitched(Block):
 
 class BlockStitchedPath(BlockStitched):
     """Stitched path block"""
+
     pass
 
 
 class BlockStitchedMaterial(BlockStitched):
     """Stitched material block"""
+
     pass
 
 
 class BlockStitchedMatvar(BlockStitched):
     """Stitched material variable block"""
+
     pass
 
 
 class BlockStitchedSpecies(BlockStitched):
     """Stitched species block"""
+
     pass
 
 
 class BlockStitchedTensor(BlockStitched):
     """Stitched tensor block"""
+
     pass
 
 
 def get_header(h):
     d = {}
-    d['filename'] = h.filename.decode()
-    d['file_version'] = h.file_version
-    d['file_revision'] = h.file_revision
-    d['code_name'] = h.code_name.decode()
-    d['step'] = h.step
-    d['time'] = h.time
-    d['jobid1'] = h.jobid1
-    d['jobid2'] = h.jobid2
-    d['code_io_version'] = h.code_io_version
-    d['restart_flag'] = h.restart_flag
-    d['other_domains'] = h.other_domains
-    d['station_file'] = h.station_file
+    d["filename"] = h.filename.decode()
+    d["file_version"] = h.file_version
+    d["file_revision"] = h.file_revision
+    d["code_name"] = h.code_name.decode()
+    d["step"] = h.step
+    d["time"] = h.time
+    d["jobid1"] = h.jobid1
+    d["jobid2"] = h.jobid2
+    d["code_io_version"] = h.code_io_version
+    d["restart_flag"] = h.restart_flag
+    d["other_domains"] = h.other_domains
+    d["station_file"] = h.station_file
     return d
 
 
 def get_run_info(block):
     from datetime import datetime
+
     h = ct.cast(block.data, ct.POINTER(RunInfo)).contents
     d = {}
-    d['version'] = f"{h.version}.{h.revision}.{h.minor_rev}"
-    d['commit_id'] = h.commit_id.decode()
-    d['sha1sum'] = h.sha1sum.decode()
-    d['compile_machine'] = h.compile_machine.decode()
-    d['compile_flags'] = h.compile_flags.decode()
-    d['compile_date'] = datetime.utcfromtimestamp(h.compile_date).strftime('%c')
-    d['run_date'] = datetime.utcfromtimestamp(h.run_date).strftime('%c')
-    d['io_data'] = datetime.utcfromtimestamp(h.io_date).strftime('%c')
+    d["version"] = f"{h.version}.{h.revision}.{h.minor_rev}"
+    d["commit_id"] = h.commit_id.decode()
+    d["sha1sum"] = h.sha1sum.decode()
+    d["compile_machine"] = h.compile_machine.decode()
+    d["compile_flags"] = h.compile_flags.decode()
+    d["compile_date"] = datetime.utcfromtimestamp(h.compile_date).strftime("%c")
+    d["run_date"] = datetime.utcfromtimestamp(h.run_date).strftime("%c")
+    d["io_data"] = datetime.utcfromtimestamp(h.io_date).strftime("%c")
     return d
 
 
 def get_member_name(name):
     sname = name.decode()
-    return ''.join([i if ((i >= "a" and i <= "z") or (i >= "A" and i <= "Z") \
-                    or (i >= "0" and i <= "9")) else "_" \
-                    for i in sname])
+    return "".join(
+        [
+            (
+                i
+                if (
+                    (i >= "a" and i <= "z")
+                    or (i >= "A" and i <= "Z")
+                    or (i >= "0" and i <= "9")
+                )
+                else "_"
+            )
+            for i in sname
+        ]
+    )
+
 
 def read(filename, convert=False, mmap=0, dict=False, derived=True):
     """Reads the SDF data and returns a dictionary of NumPy arrays.
