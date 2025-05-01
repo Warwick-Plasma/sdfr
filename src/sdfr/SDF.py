@@ -863,12 +863,12 @@ def get_member_name(name):
     )
 
 
-def read(filename, convert=False, mmap=0, dict=False, derived=True):
+def read(file=None, convert=False, mmap=0, dict=False, derived=True):
     """Reads the SDF data and returns a dictionary of NumPy arrays.
 
     Parameters
     ----------
-    filename : string
+    file : string
         The name of the SDF file to open.
     convert : bool, optional
         Convert double precision data to single when reading file.
@@ -880,10 +880,13 @@ def read(filename, convert=False, mmap=0, dict=False, derived=True):
 
     import warnings
 
+    if file == None:
+        raise TypeError("Missing file parameter")
+
     if mmap != 0:
         warnings.warn("mmap flag ignored")
 
-    blocklist = BlockList(filename, convert, derived)
+    blocklist = BlockList(file, convert, derived)
 
     if isinstance(dict, str):
         if dict == "id" or dict == "ids":
