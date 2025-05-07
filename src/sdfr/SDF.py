@@ -413,8 +413,9 @@ class BlockList:
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
                 newblock = BlockData(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
-                newblock = BlockLagrangianMesh(block)
-                meshes.append(newblock)
+                if block.datatype_out != 0:
+                    newblock = BlockLagrangianMesh(block)
+                    meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
             elif (
@@ -424,8 +425,9 @@ class BlockList:
                 newblock = BlockPlainVariable(block)
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
-                newblock = BlockPlainMesh(block)
-                meshes.append(newblock)
+                if block.datatype_out != 0:
+                    newblock = BlockPlainMesh(block)
+                    meshes.append(newblock)
             elif (
                 blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
                 or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE
@@ -500,7 +502,7 @@ class Block:
         dtype = self._datatype
         if dtype == np.byte:
             dtype = np.dtype("|S1")
-        totype = _ct_datatypes[self._contents.datatype]
+        totype = _ct_datatypes[self._contents.datatype_out]
         cast = ct.cast(data, ct.POINTER(totype))
         buf = buffer_from_memory(cast, blen)
         self._owndata = False
@@ -608,6 +610,7 @@ class BlockPlainMesh(Block):
             [block.dim_labels[i].decode() for i in range(block.ndims)]
         )
         self._mult = None
+        self._bdims = self._dims
         if bool(block.dim_mults):
             self._mult = tuple(block.dim_mults[: block.ndims])
         if bool(block.extents):
@@ -620,7 +623,7 @@ class BlockPlainMesh(Block):
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
             grids = []
-            for i, d in enumerate(self.dims):
+            for i, d in enumerate(self._bdims):
                 blen = np.dtype(self._datatype).itemsize * d
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
                 grids.append(array)
@@ -663,12 +666,12 @@ class BlockLagrangianMesh(BlockPlainMesh):
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
             blen = np.dtype(self._datatype).itemsize
-            for d in self.dims:
+            for d in self._bdims:
                 blen *= d
             grids = []
-            for i, d in enumerate(self.dims):
+            for i, d in enumerate(self._bdims):
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
-                array = array.reshape(self.dims, order="F")
+                array = array.reshape(self._bdims, order="F")
                 grids.append(array)
             self._data = tuple(grids)
         return self._data
