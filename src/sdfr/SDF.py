@@ -377,6 +377,7 @@ class BlockList:
             block._blocklist = self
             blocktype = block.blocktype
             newblock = None
+            newblock_mid = None
             name = get_member_name(block.name)
             if blocktype == SdfBlockType.SDF_BLOCKTYPE_ARRAY:
                 newblock = BlockArray(block)
@@ -415,6 +416,7 @@ class BlockList:
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
                 if block.datatype_out != 0:
                     newblock = BlockLagrangianMesh(block)
+                    newblock_mid = block
                     meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
@@ -427,6 +429,7 @@ class BlockList:
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
+                    newblock_mid = block
                     meshes.append(newblock)
             elif (
                 blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
@@ -448,6 +451,22 @@ class BlockList:
                 self._block_ids.update({block.id.decode(): newblock})
                 self._block_names.update({block.name.decode(): newblock})
             block = block.next
+
+            if newblock_mid is not None:
+                block_mid = newblock_mid
+                block_mid._handle = h
+                block_mid._blocklist = self
+                blocktype = block_mid.blocktype
+                name = get_member_name(block_mid.name) + "_mid"
+                if blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
+                    newblock = BlockLagrangianMesh(block_mid, mid=True)
+                elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
+                    newblock = BlockPlainMesh(block_mid, mid=True)
+                self.__dict__[name] = newblock
+                nm = block_mid.id.decode() + "_mid"
+                self._block_ids.update({nm: newblock})
+                nm = block_mid.name.decode() + "_mid"
+                self._block_names.update({nm: newblock})
 
         for var in mesh_vars:
             gid = var.grid_id
@@ -600,8 +619,9 @@ class BlockPlainVariable(Block):
 class BlockPlainMesh(Block):
     """Plain mesh block"""
 
-    def __init__(self, block):
+    def __init__(self, block, mid=False):
         super().__init__(block)
+        self._mid = mid
         self._data = None
         self._units = tuple(
             [block.dim_units[i].decode() for i in range(block.ndims)]
@@ -611,6 +631,10 @@ class BlockPlainMesh(Block):
         )
         self._mult = None
         self._bdims = self._dims
+        if mid:
+            self._id += "_mid"
+            self._name += "_mid"
+            self._dims = tuple([i - 1 for i in self._dims])
         if bool(block.dim_mults):
             self._mult = tuple(block.dim_mults[: block.ndims])
         if bool(block.extents):
@@ -626,6 +650,8 @@ class BlockPlainMesh(Block):
             for i, d in enumerate(self._bdims):
                 blen = np.dtype(self._datatype).itemsize * d
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
+                if self._mid:
+                    array = 0.5 * (array[1:] + array[:-1])
                 grids.append(array)
             self._data = tuple(grids)
         return self._data
@@ -672,6 +698,14 @@ class BlockLagrangianMesh(BlockPlainMesh):
             for i, d in enumerate(self._bdims):
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
                 array = array.reshape(self._bdims, order="F")
+                if self._mid:
+                    nn = len(self._bdims)
+                    for j in range(nn):
+                        s1 = nn * [slice(None)]
+                        s2 = nn * [slice(None)]
+                        s1[j] = slice(1, None)
+                        s2[j] = slice(None, -1)
+                        array = 0.5 * (array[tuple(s1)] + array[tuple(s2)])
                 grids.append(array)
             self._data = tuple(grids)
         return self._data
