@@ -442,6 +442,11 @@ class BlockList:
                 meshes.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
                 self.Run_info = get_run_info(block)
+            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_STATION:
+                sdict = BlockStation(block, name)
+                self.__dict__.update({"StationBlocks": sdict})
+                self._block_ids.update({block.id.decode(): sdict})
+                self._block_names.update({block.name.decode(): sdict})
             else:
                 # Block not supported
                 # print(name,SdfBlockType(blocktype).name)
@@ -801,6 +806,35 @@ class BlockData(Block):
     def mimetype(self):
         """mimetype for Block data contents"""
         return self._mimetype
+
+
+def BlockStation(block, name):
+    """Station block"""
+    sdict = dict(
+        stations=None,
+        step=block.step,
+        step_increment=block.step_increment,
+        time=block.time,
+        time_increment=block.time_increment,
+    )
+
+    tdict = {}
+    for i in range(block.nstations):
+        varnames = []
+        for j in range(block.station_nvars[i]):
+            varnames.append(block.material_names[i + j + 1].decode())
+        stat = dict(variables=varnames)
+        stat.update({"station_move": bool(block.station_move[i])})
+        if block.ndims > 0:
+            stat.update({"station_x": block.station_x[i]})
+        if block.ndims > 1:
+            stat.update({"station_y": block.station_y[i]})
+        if block.ndims > 2:
+            stat.update({"station_z": block.station_z[i]})
+        tdict.update({block.station_names[i].decode(): stat})
+    sdict.update({"stations": tdict})
+
+    return {name: sdict}
 
 
 class BlockStitched(Block):
