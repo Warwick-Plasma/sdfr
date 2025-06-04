@@ -30,7 +30,10 @@ from .loadlib import (
 
 from importlib.metadata import version, PackageNotFoundError
 
-__version__ = version(_module_name)
+try:
+    __version__ = version(_module_name)
+except Exception:
+    __version__ = "0.0.0"
 
 __all__ = [
     "SDF",
