@@ -367,7 +367,7 @@ class BlockList:
 
         block = h.contents.blocklist
         self.Header = get_header(h.contents)
-        meshes = []
+        mesh_id_map = {}
         mesh_vars = []
         self._block_ids = {}
         self._block_names = {}
@@ -417,7 +417,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockLagrangianMesh(block)
                     newblock_mid = block
-                    meshes.append(newblock)
+                    mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
             elif (
@@ -430,7 +430,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
                     newblock_mid = block
-                    meshes.append(newblock)
+                    mesh_id_map[newblock.id] = newblock
             elif (
                 blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
                 or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE
@@ -439,7 +439,7 @@ class BlockList:
                 mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
                 newblock = BlockPointMesh(block)
-                meshes.append(newblock)
+                mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
                 self.Run_info = get_run_info(block)
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_STATION:
@@ -452,7 +452,8 @@ class BlockList:
                 # print(name,SdfBlockType(blocktype).name)
                 pass
             if newblock is not None:
-                self.__dict__[name] = newblock
+                if not block.dont_display:
+                    self.__dict__[name] = newblock
                 self._block_ids.update({block.id.decode(): newblock})
                 self._block_names.update({block.name.decode(): newblock})
             block = block.next
@@ -467,7 +468,8 @@ class BlockList:
                     newblock = BlockLagrangianMesh(block_mid, mid=True)
                 elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
                     newblock = BlockPlainMesh(block_mid, mid=True)
-                self.__dict__[name] = newblock
+                if not newblock_mid.dont_display:
+                    self.__dict__[name] = newblock
                 nm = block_mid.id.decode() + "_mid"
                 self._block_ids.update({nm: newblock})
                 nm = block_mid.name.decode() + "_mid"
@@ -475,10 +477,8 @@ class BlockList:
 
         for var in mesh_vars:
             gid = var.grid_id
-            for mesh in meshes:
-                if mesh.id == gid:
-                    var._grid = mesh
-                    break
+            if gid in mesh_id_map:
+                var._grid = mesh_id_map[gid]
 
     def __del__(self):
         self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
