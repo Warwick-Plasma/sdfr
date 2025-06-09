@@ -40,9 +40,9 @@ def _loadlib():
     local_dir = Path(__file__).resolve().parent
     site_dirs = [Path(x) / "sdfr" for x in getsitepackages()]
     path_dirs = [Path(x) for x in sys.path]
-    exts = ("so", "dylib", "dll")
-    for lib_dir, ext in product([local_dir, *site_dirs, *path_dirs], exts):
-        if (lib := lib_dir / f"libsdfc_shared.{ext}").exists():
+    libs = ("libsdfc_shared.so", "libsdfc_shared.dylib", "sdfc_shared.dll")
+    for lib_dir, libname in product([local_dir, *site_dirs, *path_dirs], libs):
+        if (lib := lib_dir / libname).exists():
             return ct.cdll.LoadLibrary(str(lib))
     raise RuntimeError("Could not find library 'libsdfc_shared'")
 
