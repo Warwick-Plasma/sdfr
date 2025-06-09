@@ -18,6 +18,7 @@
 import ctypes as _c
 import numpy as _np
 import struct as _struct
+import re as _re
 from enum import IntEnum as _IntEnum
 from ._loadlib import sdf_lib as _sdf_lib
 from typing import Dict as _Dict
@@ -1298,22 +1299,12 @@ class BlockStitchedTensor(BlockStitched):
     pass
 
 
+_re_pattern = _re.compile(r"[^a-zA-Z0-9]")
+
+
 def _get_member_name(name):
     sname = name.decode()
-    return "".join(
-        [
-            (
-                i
-                if (
-                    (i >= "a" and i <= "z")
-                    or (i >= "A" and i <= "Z")
-                    or (i >= "0" and i <= "9")
-                )
-                else "_"
-            )
-            for i in sname
-        ]
-    )
+    return _re_pattern.sub("_", sname)
 
 
 def _read(file=None, convert=False, mmap=0, dict=False, derived=True):
