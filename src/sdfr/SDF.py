@@ -418,6 +418,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockLagrangianMesh(block)
                     newblock_mid = block
+                    newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
@@ -431,6 +432,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
                     newblock_mid = block
+                    newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
             elif (
                 blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
@@ -475,6 +477,7 @@ class BlockList:
                 self._block_ids.update({nm: newblock})
                 nm = block_mid.name.decode() + "_mid"
                 self._block_names.update({nm: newblock})
+                newblock_mid._grid_block._grid_mid = newblock
 
         for var in mesh_vars:
             gid = var.grid_id
@@ -602,6 +605,11 @@ class BlockPlainVariable(Block):
     def grid(self):
         """Associated mesh"""
         return self._grid
+
+    @property
+    def grid_mid(self):
+        """Associated median mesh"""
+        return self._grid._grid_mid
 
     @property
     def grid_id(self):
