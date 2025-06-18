@@ -340,6 +340,7 @@ class BlockList:
     """Contains all the blocks"""
 
     def __init__(self, filename, convert=False, derived=True):
+        self._handle = None
         clib = sdf_lib
         self._clib = clib
         clib.sdf_open.restype = ct.POINTER(SdfFile)
@@ -481,10 +482,12 @@ class BlockList:
                 var._grid = mesh_id_map[gid]
 
     def __del__(self):
-        self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
-        self._clib.sdf_close.argtypes = [ct.c_void_p]
-        self._clib.sdf_stack_destroy(self._handle)
-        self._clib.sdf_close(self._handle)
+        if self._handle:
+            self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
+            self._clib.sdf_close.argtypes = [ct.c_void_p]
+            self._clib.sdf_stack_destroy(self._handle)
+            self._clib.sdf_close(self._handle)
+            self._handle = None
 
     @property
     def name_dict(self):
