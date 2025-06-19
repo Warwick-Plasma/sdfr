@@ -340,6 +340,7 @@ class BlockList:
     """Contains all the blocks"""
 
     def __init__(self, filename, convert=False, derived=True):
+        self._handle = None
         clib = sdf_lib
         self._clib = clib
         clib.sdf_open.restype = ct.POINTER(SdfFile)
@@ -417,6 +418,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockLagrangianMesh(block)
                     newblock_mid = block
+                    newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
                 newblock = BlockNameValue(block)
@@ -430,6 +432,7 @@ class BlockList:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
                     newblock_mid = block
+                    newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
             elif (
                 blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
@@ -474,6 +477,7 @@ class BlockList:
                 self._block_ids.update({nm: newblock})
                 nm = block_mid.name.decode() + "_mid"
                 self._block_names.update({nm: newblock})
+                newblock_mid._grid_block._grid_mid = newblock
 
         for var in mesh_vars:
             gid = var.grid_id
@@ -481,10 +485,12 @@ class BlockList:
                 var._grid = mesh_id_map[gid]
 
     def __del__(self):
-        self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
-        self._clib.sdf_close.argtypes = [ct.c_void_p]
-        self._clib.sdf_stack_destroy(self._handle)
-        self._clib.sdf_close(self._handle)
+        if self._handle:
+            self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
+            self._clib.sdf_close.argtypes = [ct.c_void_p]
+            self._clib.sdf_stack_destroy(self._handle)
+            self._clib.sdf_close(self._handle)
+            self._handle = None
 
     @property
     def name_dict(self):
@@ -599,6 +605,11 @@ class BlockPlainVariable(Block):
     def grid(self):
         """Associated mesh"""
         return self._grid
+
+    @property
+    def grid_mid(self):
+        """Associated median mesh"""
+        return self._grid._grid_mid
 
     @property
     def grid_id(self):
@@ -901,7 +912,8 @@ def get_header(h):
 
 
 def get_run_info(block):
-    from datetime import datetime
+    from datetime import datetime as dtm
+    from datetime import UTC
 
     h = ct.cast(block.data, ct.POINTER(RunInfo)).contents
     d = {}
@@ -910,9 +922,9 @@ def get_run_info(block):
     d["sha1sum"] = h.sha1sum.decode()
     d["compile_machine"] = h.compile_machine.decode()
     d["compile_flags"] = h.compile_flags.decode()
-    d["compile_date"] = datetime.utcfromtimestamp(h.compile_date).strftime("%c")
-    d["run_date"] = datetime.utcfromtimestamp(h.run_date).strftime("%c")
-    d["io_data"] = datetime.utcfromtimestamp(h.io_date).strftime("%c")
+    d["compile_date"] = dtm.fromtimestamp(h.compile_date, UTC).strftime("%c")
+    d["run_date"] = dtm.fromtimestamp(h.run_date, UTC).strftime("%c")
+    d["io_data"] = dtm.fromtimestamp(h.io_date, UTC).strftime("%c")
     return d
 
 
