@@ -912,8 +912,10 @@ def get_header(h):
 
 
 def get_run_info(block):
+    import datetime
     from datetime import datetime as dtm
-    from datetime import UTC
+
+    utc = datetime.timezone.utc
 
     h = ct.cast(block.data, ct.POINTER(RunInfo)).contents
     d = {}
@@ -922,9 +924,9 @@ def get_run_info(block):
     d["sha1sum"] = h.sha1sum.decode()
     d["compile_machine"] = h.compile_machine.decode()
     d["compile_flags"] = h.compile_flags.decode()
-    d["compile_date"] = dtm.fromtimestamp(h.compile_date, UTC).strftime("%c")
-    d["run_date"] = dtm.fromtimestamp(h.run_date, UTC).strftime("%c")
-    d["io_data"] = dtm.fromtimestamp(h.io_date, UTC).strftime("%c")
+    d["compile_date"] = dtm.fromtimestamp(h.compile_date, utc).strftime("%c")
+    d["run_date"] = dtm.fromtimestamp(h.run_date, utc).strftime("%c")
+    d["io_data"] = dtm.fromtimestamp(h.io_date, utc).strftime("%c")
     return d
 
 
