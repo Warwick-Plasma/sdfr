@@ -370,8 +370,8 @@ class BlockList:
         self.Header = get_header(h.contents)
         mesh_id_map = {}
         mesh_vars = []
-        self._block_ids = {}
-        self._block_names = {}
+        self._block_ids = {"Header": self.Header}
+        self._block_names = {"Header": self.Header}
         for n in range(h.contents.nblocks):
             block = block.contents
             block._handle = h
