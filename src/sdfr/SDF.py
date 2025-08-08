@@ -517,14 +517,8 @@ class Block:
         self._data_length = block.data_length
         self._dims = tuple(block.dims[: block.ndims])
         self._contents = block
-        self._owndata = True
         self._blocklist = block._blocklist
         self._data = None
-
-    def __del__(self):
-        if not self._owndata and self._data is not None:
-            clib = self._handle._clib
-            clib.sdf_free_block_data(self._handle, self._contents)
 
     def _numpy_from_buffer(self, data, blen):
         buffer_from_memory = ct.pythonapi.PyMemoryView_FromMemory
@@ -535,7 +529,6 @@ class Block:
         totype = _ct_datatypes[self._contents.datatype_out]
         cast = ct.cast(data, ct.POINTER(totype))
         buf = buffer_from_memory(cast, blen)
-        self._owndata = False
         return np.frombuffer(buf, dtype)
 
     @property
