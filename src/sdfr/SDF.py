@@ -20,6 +20,8 @@ import numpy as _np
 import struct as _struct
 from enum import IntEnum as _IntEnum
 from ._loadlib import sdf_lib as _sdf_lib
+from typing import Dict as _Dict
+from typing import Any as _Any
 
 # try:
 #    import xarray as xr
@@ -354,6 +356,30 @@ class RunInfo(_c.Structure):
     ]
 
 
+class BlockDict(dict):
+    def __init__(self, _dict, block):
+        self.handle = block._handle
+        super().__init__(_dict)
+
+    def __setitem__(self, key, value):
+        h = self.handle
+        if key in (
+            "step",
+            "time",
+            "code_io_version",
+            "string_length",
+            "jobid1",
+            "jobid2",
+        ):
+            setattr(h.contents, key, value)
+        elif key == "code_name":
+            h._clib.sdf_set_code_name(h, value.encode("utf-8"))
+        else:
+            print(f'WARNING: unable to set header key "{key}"')
+            return
+        super().__setitem__(key, value)
+
+
 class BlockList:
     """Contains all the blocks"""
 
@@ -434,7 +460,7 @@ class BlockList:
 
         block = h.contents.blocklist
         h.contents.restart_flag = restart
-        self.Header = _get_header(h.contents)
+        self._header = self._get_header(h.contents)
         mesh_id_map = {}
         mesh_vars = []
         self._block_ids = {"Header": self.Header}
@@ -561,6 +587,42 @@ class BlockList:
         if not self._handle:
             return
         self._clib.sdf_write(self._handle, filename.encode())
+
+    @property
+    def Header(self) -> _Dict[str, _Any]:
+        """SDF file header"""
+        return self._header
+
+    @Header.setter
+    def Header(self, value):
+        try:
+            for k, v in value.items():
+                self.Header[k] = v
+        except Exception:
+            print("failed")
+
+    def _get_header(self, h):
+        d = {}
+        for k in [
+            "filename",
+            "file_version",
+            "file_revision",
+            "code_name",
+            "step",
+            "time",
+            "jobid1",
+            "jobid2",
+            "code_io_version",
+            "restart_flag",
+            "other_domains",
+            "station_file",
+        ]:
+            attr = getattr(h, k)
+            if isinstance(attr, bytes):
+                d[k] = attr.decode()
+            else:
+                d[k] = attr
+        return BlockDict(d, self)
 
     def _set_block_name(self, id, name):
         self._clib.sdf_set_block_name(
@@ -1247,25 +1309,6 @@ class BlockStitchedTensor(BlockStitched):
     """Stitched tensor block"""
 
     pass
-
-
-def _get_header(h):
-    d = {}
-    if h.filename:
-        d["filename"] = h.filename.decode()
-    d["file_version"] = h.file_version
-    d["file_revision"] = h.file_revision
-    if h.code_name:
-        d["code_name"] = h.code_name.decode()
-    d["step"] = h.step
-    d["time"] = h.time
-    d["jobid1"] = h.jobid1
-    d["jobid2"] = h.jobid2
-    d["code_io_version"] = h.code_io_version
-    d["restart_flag"] = h.restart_flag
-    d["other_domains"] = h.other_domains
-    d["station_file"] = h.station_file
-    return d
 
 
 def _get_member_name(name):
