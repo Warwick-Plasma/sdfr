@@ -339,7 +339,15 @@ class RunInfo(ct.Structure):
 class BlockList:
     """Contains all the blocks"""
 
-    def __init__(self, filename, convert=False, derived=True):
+    def __init__(
+        self,
+        filename,
+        convert=False,
+        derived=True,
+        mode=SDF_READ,
+        code_name="sdfr",
+        restart=False,
+    ):
         self._handle = None
         clib = sdf_lib
         self._clib = clib
@@ -350,8 +358,14 @@ class BlockList:
         clib.sdf_read_blocklist_all.argtypes = [ct.c_void_p]
         clib.sdf_helper_read_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
         clib.sdf_free_block_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
+        clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
+        clib.sdf_close.argtypes = [ct.c_void_p]
+        clib.sdf_write.argtypes = [ct.c_void_p]
+        clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
 
-        h = clib.sdf_open(filename.encode("utf-8"), 0, 1, 0)
+        comm = 0
+        use_mmap = 0
+        h = clib.sdf_open(filename.encode("utf-8"), comm, mode, use_mmap)
         if h is None or not bool(h):
             raise Exception(f"Failed to open file: '{filename}'")
 
@@ -361,12 +375,16 @@ class BlockList:
         h._clib = clib
         self._handle = h
         clib.sdf_stack_init(h)
-        if derived:
-            clib.sdf_read_blocklist_all(h)
+        if mode == SDF_READ:
+            if derived:
+                clib.sdf_read_blocklist_all(h)
+            else:
+                clib.sdf_read_blocklist(h)
         else:
-            clib.sdf_read_blocklist(h)
+            clib.sdf_set_code_name(h, code_name.encode("utf-8"))
 
         block = h.contents.blocklist
+        h.contents.restart_flag = restart
         self.Header = get_header(h.contents)
         mesh_id_map = {}
         mesh_vars = []
@@ -486,11 +504,14 @@ class BlockList:
 
     def __del__(self):
         if self._handle:
-            self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
-            self._clib.sdf_close.argtypes = [ct.c_void_p]
             self._clib.sdf_stack_destroy(self._handle)
             self._clib.sdf_close(self._handle)
             self._handle = None
+
+    def write(self):
+        if not self._handle:
+            return
+        self._clib.sdf_write(self._handle)
 
     @property
     def name_dict(self):
@@ -892,7 +913,8 @@ def get_header(h):
     d["filename"] = h.filename.decode()
     d["file_version"] = h.file_version
     d["file_revision"] = h.file_revision
-    d["code_name"] = h.code_name.decode()
+    if h.code_name:
+        d["code_name"] = h.code_name.decode()
     d["step"] = h.step
     d["time"] = h.time
     d["jobid1"] = h.jobid1
@@ -965,6 +987,30 @@ def read(file=None, convert=False, mmap=0, dict=False, derived=True):
         warnings.warn("mmap flag ignored")
 
     blocklist = BlockList(file, convert, derived)
+
+    if isinstance(dict, str):
+        if dict == "id" or dict == "ids":
+            return blocklist._block_ids
+    elif isinstance(dict, bool) and dict:
+        return blocklist._block_names
+
+    return blocklist
+
+
+def open(file, dict=False, code_name="sdfr", restart=False):
+    """Opens the SDF data and returns a dictionary of NumPy arrays.
+
+    Parameters
+    ----------
+    file : string
+        The name of the SDF file to open.
+    dict : bool, optional
+        Return file contents as a dictionary rather than member names.
+    """
+
+    blocklist = BlockList(
+        file, mode=SDF_WRITE, code_name=code_name, restart=restart
+    )
 
     if isinstance(dict, str):
         if dict == "id" or dict == "ids":
