@@ -17,6 +17,7 @@
 
 import ctypes as ct
 import numpy as np
+import struct
 from enum import IntEnum
 from .loadlib import sdf_lib
 
@@ -117,6 +118,17 @@ _ct_datatypes = [
     ct.c_bool,
     0,
 ]
+_st_datatypes = [
+    0,
+    "i",
+    "q",
+    "f",
+    "d",
+    "d",
+    "c",
+    "?",
+    0,
+]
 
 # Constants
 SDF_READ = 1
@@ -187,7 +199,7 @@ SdfBlock._fields_ = [
     ("ngrids", ct.c_int),
     ("offset", ct.c_int),
     ("ngb", ct.c_int * 6),
-    ("const_value", ct.c_char * 16),
+    ("const_value", ct.c_byte * 16),
     ("id", ct.c_char_p),
     ("units", ct.c_char_p),
     ("mesh_id", ct.c_char_p),
@@ -363,7 +375,13 @@ class BlockList:
         clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
         clib.sdf_close.argtypes = [ct.c_void_p]
         clib.sdf_write.argtypes = [ct.c_void_p, ct.c_char_p]
+        clib.sdf_get_next_block.argtypes = [ct.c_void_p]
         clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
+        clib.sdf_set_block_name.argtypes = [
+            ct.c_void_p,
+            ct.c_char_p,
+            ct.c_char_p,
+        ]
 
         comm = 0
         use_mmap = 0
@@ -517,6 +535,54 @@ class BlockList:
         if not self._handle:
             return
         self._clib.sdf_write(self._handle, filename.encode())
+
+    def _set_block_name(self, id, name):
+        self._clib.sdf_set_block_name(
+            self._handle, id.encode("utf-8"), name.encode("utf-8")
+        )
+
+    def _add_constant(self, name, value=0, datatype=None, id=None):
+        if datatype is None:
+            datatype = SdfDataType.SDF_DATATYPE_NULL
+            if isinstance(value, bool):
+                datatype = SdfDataType.SDF_DATATYPE_LOGICAL
+            elif isinstance(value, int):
+                datatype = SdfDataType.SDF_DATATYPE_INTEGER8
+            elif isinstance(value, float):
+                datatype = SdfDataType.SDF_DATATYPE_REAL8
+            else:
+                print(f'Block "{id}", unsupported datatype: {type(value)}')
+                return
+
+        self._clib.sdf_get_next_block(self._handle)
+        h = self._handle.contents
+        h.nblocks += 1
+        h.nblocks_file += 1
+        block = h.current_block.contents
+        block.datatype = datatype
+        block.in_file = 1
+        const_value = struct.pack(_st_datatypes[block.datatype], value)
+        ct.memmove(block.const_value, const_value, 16)
+        self._set_block_name(id, name)
+        block._handle = self._handle
+        block._blocklist = h.blocklist
+
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+        newblock = BlockConstant(block)
+        if newblock is not None:
+            if not block.dont_display:
+                self.__dict__[name] = newblock
+            self._block_ids.update({id: newblock})
+            self._block_names.update({name: newblock})
+
+    def add_block(self, name, value=None, id=None, **kwargs):
+        if id is None:
+            id = name
+        if id in self._block_ids:
+            print(f'Unable to create block. ID duplicated: "{id}"')
+            return
+
+        self._add_constant(name, value, id=id, **kwargs)
 
     @property
     def name_dict(self):
