@@ -376,6 +376,11 @@ class BlockList:
         clib.sdf_close.argtypes = [ct.c_void_p]
         clib.sdf_write.argtypes = [ct.c_void_p, ct.c_char_p]
         clib.sdf_get_next_block.argtypes = [ct.c_void_p]
+        clib.sdf_set_namevalue.argtypes = [
+            ct.POINTER(SdfBlock),
+            ct.POINTER(ct.c_char_p),
+            ct.POINTER(ct.c_void_p),
+        ]
         clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
         clib.sdf_set_block_name.argtypes = [
             ct.c_void_p,
@@ -541,6 +546,13 @@ class BlockList:
             self._handle, id.encode("utf-8"), name.encode("utf-8")
         )
 
+    def _string_array_ctype(self, values):
+        strings = [s.encode("utf-8") for s in values]
+        strings = [ct.create_string_buffer(s) for s in strings]
+        strings = [ct.cast(s, ct.c_char_p) for s in strings]
+        strings = (ct.c_char_p * len(values))(*strings)
+        return strings
+
     def _add_preamble(self, id, name, datatype):
         self._clib.sdf_get_next_block(self._handle)
         h = self._handle.contents
@@ -557,6 +569,8 @@ class BlockList:
     def _add_post(self, block):
         if block.blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
             newblock = BlockConstant(block)
+        elif block.blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
+            newblock = BlockNameValue(block)
         else:
             return
 
@@ -580,6 +594,23 @@ class BlockList:
 
         self._add_post(block)
 
+    def _add_namevalue(self, name, value={}, datatype=None, id=None):
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+
+        nvalue = len(value)
+        block.ndims = nvalue
+        ctype = _ct_datatypes[block.datatype]
+        if block.datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            vals = self._string_array_ctype(value.values())
+        else:
+            vals = (ctype * nvalue)(*value.values())
+        names = self._string_array_ctype(value.keys())
+        vals = ct.cast(vals, ct.POINTER(ct.c_void_p))
+        self._clib.sdf_set_namevalue(block, names, vals)
+
+        self._add_post(block)
+
     def add_block(self, name, value=None, id=None, **kwargs):
         if id is None:
             id = name
@@ -587,8 +618,12 @@ class BlockList:
             print(f'Unable to create block. ID duplicated: "{id}"')
             return
 
-        val = value
-        blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+        if isinstance(value, dict):
+            val = next(iter(value.values()), None)
+            blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+        else:
+            val = value
+            blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
 
         datatype = None
         if isinstance(val, bool):
@@ -601,10 +636,14 @@ class BlockList:
             datatype = SdfDataType.SDF_DATATYPE_REAL4
         elif isinstance(val, float):
             datatype = SdfDataType.SDF_DATATYPE_REAL8
+        elif isinstance(val, str):
+            datatype = SdfDataType.SDF_DATATYPE_CHARACTER
         else:
             blocktype = None
 
-        if blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
+        if blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
+            self._add_namevalue(name, value, id=id, datatype=datatype, **kwargs)
+        elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
             self._add_constant(name, value, id=id, datatype=datatype, **kwargs)
         else:
             print(f'Block "{id}", unsupported datatype: {type(value)}')
