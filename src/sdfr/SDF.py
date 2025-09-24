@@ -561,6 +561,7 @@ class BlockList:
         block = h.current_block.contents
         block._handle = self._handle
         block._blocklist = h.blocklist
+        block._data = None
         block.datatype = datatype
         block.in_file = 1
         block.AddBlock = None
@@ -577,6 +578,8 @@ class BlockList:
         name = block.name.decode()
         if not block.dont_display:
             self.__dict__[name] = newblock
+        if block._data is not None:
+            newblock._data = block._data
         self._block_ids.update({id: newblock})
         self._block_names.update({name: newblock})
 
@@ -612,6 +615,23 @@ class BlockList:
 
         self._add_post(block)
 
+    def _add_array(self, name, value=(), datatype=None, id=None):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_ARRAY
+        block.AddBlock = BlockArray
+
+        block._data = np.array(value)
+        block.ndims = block._data.ndim
+        for i in range(block.ndims):
+            block.dims[i] = block._data.shape[i]
+        block.data = block._data.ctypes.data_as(ct.c_void_p)
+
+        self._add_post(block)
+
     def add_block(self, name, value=None, id=None, **kwargs):
         if id is None:
             id = name
@@ -622,6 +642,11 @@ class BlockList:
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
             add_func = self._add_namevalue
+        elif isinstance(value, (tuple, list, np.ndarray)):
+            arr = np.array(value)
+            if arr.ndim == 1:
+                val = value[0]
+                add_func = self._add_array
         else:
             val = value
             add_func = self._add_constant
