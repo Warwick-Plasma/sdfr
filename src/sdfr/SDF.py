@@ -546,8 +546,12 @@ class BlockList:
             datatype = SdfDataType.SDF_DATATYPE_NULL
             if isinstance(value, bool):
                 datatype = SdfDataType.SDF_DATATYPE_LOGICAL
-            elif isinstance(value, int):
+            elif isinstance(value, np.int32):
+                datatype = SdfDataType.SDF_DATATYPE_INTEGER4
+            elif isinstance(value, (int, np.int64)):
                 datatype = SdfDataType.SDF_DATATYPE_INTEGER8
+            elif isinstance(value, np.float32):
+                datatype = SdfDataType.SDF_DATATYPE_REAL4
             elif isinstance(value, float):
                 datatype = SdfDataType.SDF_DATATYPE_REAL8
             else:
