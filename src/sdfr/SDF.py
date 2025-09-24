@@ -542,22 +542,6 @@ class BlockList:
         )
 
     def _add_constant(self, name, value=0, datatype=None, id=None):
-        if datatype is None:
-            datatype = SdfDataType.SDF_DATATYPE_NULL
-            if isinstance(value, bool):
-                datatype = SdfDataType.SDF_DATATYPE_LOGICAL
-            elif isinstance(value, np.int32):
-                datatype = SdfDataType.SDF_DATATYPE_INTEGER4
-            elif isinstance(value, (int, np.int64)):
-                datatype = SdfDataType.SDF_DATATYPE_INTEGER8
-            elif isinstance(value, np.float32):
-                datatype = SdfDataType.SDF_DATATYPE_REAL4
-            elif isinstance(value, float):
-                datatype = SdfDataType.SDF_DATATYPE_REAL8
-            else:
-                print(f'Block "{id}", unsupported datatype: {type(value)}')
-                return
-
         self._clib.sdf_get_next_block(self._handle)
         h = self._handle.contents
         h.nblocks += 1
@@ -565,6 +549,7 @@ class BlockList:
         block = h.current_block.contents
         block.datatype = datatype
         block.in_file = 1
+
         const_value = struct.pack(_st_datatypes[block.datatype], value)
         ct.memmove(block.const_value, const_value, 16)
         self._set_block_name(id, name)
@@ -586,7 +571,25 @@ class BlockList:
             print(f'Unable to create block. ID duplicated: "{id}"')
             return
 
-        self._add_constant(name, value, id=id, **kwargs)
+        val = value
+
+        datatype = None
+        if isinstance(val, bool):
+            datatype = SdfDataType.SDF_DATATYPE_LOGICAL
+        elif isinstance(val, np.int32):
+            datatype = SdfDataType.SDF_DATATYPE_INTEGER4
+        elif isinstance(val, (int, np.int64)):
+            datatype = SdfDataType.SDF_DATATYPE_INTEGER8
+        elif isinstance(val, np.float32):
+            datatype = SdfDataType.SDF_DATATYPE_REAL4
+        elif isinstance(val, float):
+            datatype = SdfDataType.SDF_DATATYPE_REAL8
+
+        if datatype:
+            self._add_constant(name, value, id=id, datatype=datatype, **kwargs)
+        else:
+            print(f'Block "{id}", unsupported datatype: {type(value)}')
+            return
 
     @property
     def name_dict(self):
