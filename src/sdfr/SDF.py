@@ -563,14 +563,13 @@ class BlockList:
         block._blocklist = h.blocklist
         block.datatype = datatype
         block.in_file = 1
+        block.AddBlock = None
         self._set_block_name(id, name)
         return h, block
 
     def _add_post(self, block):
-        if block.blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
-            newblock = BlockConstant(block)
-        elif block.blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
-            newblock = BlockNameValue(block)
+        if block.AddBlock:
+            newblock = block.AddBlock(block)
         else:
             return
 
@@ -588,6 +587,7 @@ class BlockList:
 
         h, block = self._add_preamble(id, name, datatype)
         block.blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+        block.AddBlock = BlockConstant
 
         const_value = struct.pack(_st_datatypes[block.datatype], value)
         ct.memmove(block.const_value, const_value, 16)
@@ -597,6 +597,7 @@ class BlockList:
     def _add_namevalue(self, name, value={}, datatype=None, id=None):
         h, block = self._add_preamble(id, name, datatype)
         block.blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+        block.AddBlock = BlockNameValue
 
         nvalue = len(value)
         block.ndims = nvalue
@@ -620,10 +621,10 @@ class BlockList:
 
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
-            blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+            add_func = self._add_namevalue
         else:
             val = value
-            blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+            add_func = self._add_constant
 
         datatype = None
         if isinstance(val, bool):
@@ -639,12 +640,10 @@ class BlockList:
         elif isinstance(val, str):
             datatype = SdfDataType.SDF_DATATYPE_CHARACTER
         else:
-            blocktype = None
+            add_func = None
 
-        if blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
-            self._add_namevalue(name, value, id=id, datatype=datatype, **kwargs)
-        elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
-            self._add_constant(name, value, id=id, datatype=datatype, **kwargs)
+        if add_func:
+            add_func(name, value, id=id, datatype=datatype, **kwargs)
         else:
             print(f'Block "{id}", unsupported datatype: {type(value)}')
             return
