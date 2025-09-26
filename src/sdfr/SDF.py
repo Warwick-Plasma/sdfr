@@ -387,6 +387,15 @@ class BlockList:
             ct.c_char_p,
             ct.c_char_p,
         ]
+        clib.sdf_set_defaults.argtypes = [
+            ct.c_void_p,
+            ct.POINTER(SdfBlock),
+        ]
+        clib.sdf_create_id.argtypes = [
+            ct.c_void_p,
+            ct.c_char_p,
+        ]
+        clib.sdf_create_id.restype = ct.POINTER(ct.c_char_p)
 
         comm = 0
         use_mmap = 0
@@ -546,6 +555,10 @@ class BlockList:
             self._handle, id.encode("utf-8"), name.encode("utf-8")
         )
 
+    def _create_id(self, values):
+        tmp = self._clib.sdf_create_id(self._handle, values.encode("utf-8"))
+        return ct.cast(tmp, ct.c_char_p)
+
     def _string_array_ctype(self, values):
         strings = [s.encode("utf-8") for s in values]
         strings = [ct.create_string_buffer(s) for s in strings]
@@ -632,6 +645,60 @@ class BlockList:
 
         self._add_post(block)
 
+    def _add_plainvar(
+        self,
+        name,
+        value=(),
+        datatype=None,
+        id=None,
+        mult=None,
+        units=None,
+        mesh_id=None,
+        stagger=None,
+    ):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
+            return
+        try:
+            mult = float(mult)
+        except Exception:
+            if mult is not None:
+                print(f"ERROR: unable to use mult parameter, {mult}")
+                return
+        try:
+            stagger = SdfStagger(stagger)
+        except Exception:
+            if stagger is not None:
+                print(f"ERROR: unable to use stagger parameter, {stagger}")
+                return
+        if units is not None and not isinstance(units, str):
+            print(f"ERROR: unable to use units parameter, {units}")
+            return
+        if mesh_id is not None and not isinstance(mesh_id, str):
+            print(f"ERROR: unable to use mesh_id parameter, {mesh_id}")
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE
+        block.AddBlock = BlockPlainVariable
+
+        block._data = np.array(value, order="F")
+        block.ndims = block._data.ndim
+        for i in range(block.ndims):
+            block.dims[i] = block._data.shape[i]
+        block.data = block._data.ctypes.data_as(ct.c_void_p)
+        if mult is not None:
+            block.mult = mult
+        if isinstance(units, str):
+            block.units = self._create_id(units)
+        if isinstance(mesh_id, str):
+            block.mesh_id = self._create_id(mesh_id)
+        if stagger:
+            block.stagger = stagger
+
+        self._clib.sdf_set_defaults(self._handle, block)
+        self._add_post(block)
+
     def add_block(self, name, value=None, id=None, **kwargs):
         if id is None:
             id = name
@@ -647,6 +714,9 @@ class BlockList:
             if arr.ndim == 1:
                 val = value[0]
                 add_func = self._add_array
+            else:
+                val = arr.flatten()[0]
+                add_func = self._add_plainvar
         else:
             val = value
             add_func = self._add_constant
