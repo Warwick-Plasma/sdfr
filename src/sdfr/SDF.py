@@ -396,6 +396,12 @@ class BlockList:
             ct.c_char_p,
         ]
         clib.sdf_create_id.restype = ct.POINTER(ct.c_char_p)
+        clib.sdf_create_id_array.argtypes = [
+            ct.c_void_p,
+            ct.c_int,
+            ct.POINTER(ct.c_char_p),
+        ]
+        clib.sdf_create_id_array.restype = ct.POINTER(ct.c_char_p)
 
         comm = 0
         use_mmap = 0
@@ -566,6 +572,11 @@ class BlockList:
         strings = (ct.c_char_p * len(values))(*strings)
         return strings
 
+    def _create_id_array(self, values):
+        values = self._string_array_ctype(values)
+        res = self._clib.sdf_create_id_array(self._handle, len(values), values)
+        return res
+
     def _add_preamble(self, id, name, datatype):
         self._clib.sdf_get_next_block(self._handle)
         h = self._handle.contents
@@ -699,13 +710,52 @@ class BlockList:
         self._clib.sdf_set_defaults(self._handle, block)
         self._add_post(block)
 
-    def add_block(self, name, value=None, id=None, **kwargs):
-        if id is None:
-            id = name
-        if id in self._block_ids:
-            print(f'Unable to create block. ID duplicated: "{id}"')
+    def _add_mesh(
+        self,
+        name,
+        value=None,
+        datatype=None,
+        id=None,
+        units=None,
+        labels=None,
+        geometry=None,
+        **kwargs,
+    ):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
             return
 
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH
+        block.AddBlock = BlockPlainMesh
+
+        keys = ["x", "y", "z"]
+        keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+        val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+
+        block._data = [np.array(kwargs[k], dtype=val.dtype) for k in keys]
+        block._data = [np.array(row, order="F") for row in block._data]
+        block._data = tuple(block._data)
+        block.ndims = len(block._data)
+        block.ngrids = block.ndims
+        grids = [row.ctypes.data_as(ct.c_void_p) for row in block._data]
+        block.grids = (ct.c_void_p * block.ngrids)(*grids)
+        for i in range(block.ndims):
+            block.dims[i] = block._data[i].shape[0]
+        if isinstance(units, (list, tuple)):
+            block.dim_units = self._create_id_array(units)
+        if isinstance(labels, (list, tuple)):
+            block.dim_labels = self._create_id_array(labels)
+        if isinstance(geometry, str):
+            if geometry == "rz":
+                geometry = SdfGeometry.SDF_GEOMETRY_CYLINDRICAL
+        if isinstance(geometry, int):
+            block.geometry = geometry
+
+        self._clib.sdf_set_defaults(self._handle, block)
+        self._add_post(block)
+
+    def add_block(self, name, value=None, id=None, **kwargs):
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
             add_func = self._add_namevalue
@@ -717,9 +767,22 @@ class BlockList:
             else:
                 val = arr.flatten()[0]
                 add_func = self._add_plainvar
-        else:
+        elif value is not None:
             val = value
             add_func = self._add_constant
+        else:
+            keys = ["x", "y", "z"]
+            keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+            val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+            add_func = self._add_mesh
+            if id is None:
+                id = "grid"
+
+        if id is None:
+            id = name
+        if id in self._block_ids:
+            print(f'Unable to create block. ID duplicated: "{id}"')
+            return
 
         datatype = None
         if isinstance(val, bool):
@@ -738,7 +801,7 @@ class BlockList:
             add_func = None
 
         if add_func:
-            add_func(name, value, id=id, datatype=datatype, **kwargs)
+            add_func(name, value=value, id=id, datatype=datatype, **kwargs)
         else:
             print(f'Block "{id}", unsupported datatype: {type(value)}')
             return
