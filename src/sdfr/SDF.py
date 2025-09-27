@@ -726,8 +726,6 @@ class BlockList:
             return
 
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH
-        block.AddBlock = BlockPlainMesh
 
         keys = ["x", "y", "z"]
         keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
@@ -740,8 +738,16 @@ class BlockList:
         block.ngrids = block.ndims
         grids = [row.ctypes.data_as(ct.c_void_p) for row in block._data]
         block.grids = (ct.c_void_p * block.ngrids)(*grids)
-        for i in range(block.ndims):
-            block.dims[i] = block._data[i].shape[0]
+        if block._data[0].ndim == 1:
+            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH
+            block.AddBlock = BlockPlainMesh
+            for i in range(block.ndims):
+                block.dims[i] = block._data[i].shape[0]
+        else:
+            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH
+            block.AddBlock = BlockLagrangianMesh
+            for i in range(block.ndims):
+                block.dims[i] = block._data[0].shape[i]
         if isinstance(units, (list, tuple)):
             block.dim_units = self._create_id_array(units)
         if isinstance(labels, (list, tuple)):
