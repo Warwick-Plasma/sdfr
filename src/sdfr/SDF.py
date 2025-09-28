@@ -341,7 +341,7 @@ class BlockList:
 
     def __init__(
         self,
-        filename,
+        filename=None,
         convert=False,
         derived=True,
         mode=SDF_READ,
@@ -353,6 +353,8 @@ class BlockList:
         self._clib = clib
         clib.sdf_open.restype = ct.POINTER(SdfFile)
         clib.sdf_open.argtypes = [ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+        clib.sdf_new.restype = ct.POINTER(SdfFile)
+        clib.sdf_new.argtypes = [ct.c_int, ct.c_int]
         clib.sdf_stack_init.argtypes = [ct.c_void_p]
         clib.sdf_read_blocklist.argtypes = [ct.c_void_p]
         clib.sdf_read_blocklist_all.argtypes = [ct.c_void_p]
@@ -360,12 +362,15 @@ class BlockList:
         clib.sdf_free_block_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
         clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
         clib.sdf_close.argtypes = [ct.c_void_p]
-        clib.sdf_write.argtypes = [ct.c_void_p]
+        clib.sdf_write.argtypes = [ct.c_void_p, ct.c_char_p]
         clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
 
         comm = 0
         use_mmap = 0
-        h = clib.sdf_open(filename.encode("utf-8"), comm, mode, use_mmap)
+        if filename is None:
+            h = clib.sdf_new(comm, use_mmap)
+        else:
+            h = clib.sdf_open(filename.encode("utf-8"), comm, mode, use_mmap)
         if h is None or not bool(h):
             raise Exception(f"Failed to open file: '{filename}'")
 
@@ -508,10 +513,10 @@ class BlockList:
             self._clib.sdf_close(self._handle)
             self._handle = None
 
-    def write(self):
+    def write(self, filename):
         if not self._handle:
             return
-        self._clib.sdf_write(self._handle)
+        self._clib.sdf_write(self._handle, filename.encode())
 
     @property
     def name_dict(self):
@@ -910,7 +915,8 @@ class BlockStitchedTensor(BlockStitched):
 
 def get_header(h):
     d = {}
-    d["filename"] = h.filename.decode()
+    if h.filename:
+        d["filename"] = h.filename.decode()
     d["file_version"] = h.file_version
     d["file_revision"] = h.file_revision
     if h.code_name:
@@ -997,20 +1003,16 @@ def read(file=None, convert=False, mmap=0, dict=False, derived=True):
     return blocklist
 
 
-def open(file, dict=False, code_name="sdfr", restart=False):
-    """Opens the SDF data and returns a dictionary of NumPy arrays.
+def new(dict=False, code_name="sdfr", restart=False):
+    """Creates a new SDF blocklist and returns a dictionary of NumPy arrays.
 
     Parameters
     ----------
-    file : string
-        The name of the SDF file to open.
     dict : bool, optional
         Return file contents as a dictionary rather than member names.
     """
 
-    blocklist = BlockList(
-        file, mode=SDF_WRITE, code_name=code_name, restart=restart
-    )
+    blocklist = BlockList(mode=SDF_WRITE, code_name=code_name, restart=restart)
 
     if isinstance(dict, str):
         if dict == "id" or dict == "ids":
