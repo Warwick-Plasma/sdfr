@@ -17,7 +17,6 @@
 
 import sys
 import ctypes as ct
-from contextlib import suppress
 from itertools import product
 from pathlib import Path
 from site import getsitepackages
@@ -30,11 +29,6 @@ def _loadlib():
     packages. This enables the library to be found even on an editable install.
     Raises a ``RuntimeError`` if it is missing.
     """
-    # Try finding library using import.
-    # Expect this to fail, but it will trigger a rebuild if the project is
-    # installed in editable mode.
-    with suppress(ImportError):
-        import sdfr
 
     # Find library in site-packages or local to this module
     local_dir = Path(__file__).resolve().parent

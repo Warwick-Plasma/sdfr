@@ -11,11 +11,11 @@ try:
         TextArea,
         AnchoredOffsetbox,
     )
-except:
+except Exception:
     pass
 try:
     from mpl_toolkits.axes_grid1 import make_axes_locatable
-except:
+except Exception:
     try:
         # Workaround for broken macOS installation
         import sys
@@ -25,11 +25,11 @@ except:
             os.path.join(matplotlib.__path__[0], "..", "mpl_toolkits")
         )
         from axes_grid1 import make_axes_locatable
-    except:
+    except Exception:
         pass
 try:
     import builtins
-except:
+except Exception:
     import __builtin__ as builtins
 
 try:
@@ -353,7 +353,7 @@ def get_job_id(file_list=None, base=None, block=None):
             data = sdf.read(base, mmap=0)
             if len(data.__dict__) > 1:
                 return data.Header["jobid1"]
-        except:
+        except Exception:
             pass
 
     # Find the job id
@@ -364,7 +364,7 @@ def get_job_id(file_list=None, base=None, block=None):
                 if len(data.__dict__) < 2:
                     continue
                 return data.Header["jobid1"]
-            except:
+            except Exception:
                 pass
 
     return None
@@ -435,7 +435,7 @@ def get_files(wkd=None, base=None, block=None, varname=None, fast=True):
                     file_list.append(f)
             elif len(file_list) > 0:
                 break
-        except:
+        except Exception:
             pass
 
     return list(reversed(file_list))
@@ -708,7 +708,7 @@ def sdfr(filename):
 def plot_auto(*args, **kwargs):
     try:
         dims = args[0].dims
-    except:
+    except Exception:
         print(
             "error: Variable cannot be auto determined. "
             + "Use plot1d or plot2d"
@@ -773,7 +773,7 @@ def plot1d(
     hold=True,
     subplot=None,
     figure=None,
-    **kwargs
+    **kwargs,
 ):
     global data
     global x, y, mult_x, mult_y
@@ -791,7 +791,7 @@ def plot1d(
             if not hold:
                 try:
                     figure.clf()
-                except:
+                except Exception:
                     pass
         elif not hold:
             figure.clf()
@@ -913,7 +913,7 @@ def plot_path(
     axis_only=False,
     clip_reflect=False,
     power=(-3, 3),
-    **kwargs
+    **kwargs,
 ):
     """Plot an SDF path variable (eg. a laser ray)
 
@@ -1022,7 +1022,7 @@ def plot_path(
             if not hold:
                 try:
                     figure.clf()
-                except:
+                except Exception:
                     pass
         elif not hold:
             figure.clf()
@@ -1204,7 +1204,7 @@ def plot_path(
         try:
             cbar.formatter.set_powerlimits(power)
             cbar.update_ticks()
-        except:
+        except Exception:
             pass
         subplot.colorbar = cax
         plt.sca(ax)
@@ -1278,21 +1278,21 @@ def plot_rays(var, skip=1, rays=None, **kwargs):
     else:
         ray_start, ray_stop = None, None
 
-        l = "ray_start"
-        if l in kwargs:
-            ray_start = kwargs[l]
+        k = "ray_start"
+        if k in kwargs:
+            ray_start = kwargs[k]
 
-        l = "ray_stop"
-        if l in kwargs:
-            ray_stop = kwargs[l]
+        k = "ray_stop"
+        if k in kwargs:
+            ray_stop = kwargs[k]
 
         ray_slice = slice(ray_start, ray_stop, skip)
 
     if isinstance(var, sdf.BlockStitchedPath):
         v = var.data[0]
-        l = "_label"
-        if l not in kwargs:
-            kwargs[l] = var.name
+        lab = "_label"
+        if lab not in kwargs:
+            kwargs[lab] = var.name
 
         if isinstance(v, sdf.BlockStitchedPath):
             for v in var.data:
@@ -1310,8 +1310,8 @@ def plot_rays(var, skip=1, rays=None, **kwargs):
             if k not in kwargs or (
                 kwargs[k] and not isinstance(kwargs[k], str)
             ):
-                kwargs[k] = kwargs[l] + " $(" + escape_latex(v.units) + ")$"
-                del kwargs[l]
+                kwargs[k] = kwargs[lab] + " $(" + escape_latex(v.units) + ")$"
+                del kwargs[lab]
 
             k0 = "vmin"
             k1 = "vmax"
@@ -1424,7 +1424,7 @@ def plot2d_array(
     cbar_wd=5,
     cbar_top=False,
     power=(-3, 3),
-    **kwargs
+    **kwargs,
 ):
     import matplotlib as mpl
 
@@ -1468,7 +1468,7 @@ def plot2d_array(
             if not hold:
                 try:
                     figure.clf()
-                except:
+                except Exception:
                     pass
         elif not hold:
             figure.clf()
@@ -1573,7 +1573,7 @@ def plot2d_array(
                 cmap=cmap,
                 vmin=vrange[0],
                 vmax=vrange[1],
-                **kwargs
+                **kwargs,
             )
     else:
         X = np.multiply(mult_x, X)
@@ -1622,7 +1622,7 @@ def plot2d_array(
         try:
             cbar.formatter.set_powerlimits(power)
             cbar.update_ticks()
-        except:
+        except Exception:
             pass
         subplot.colorbar = cax
         plt.sca(ax)
@@ -1663,7 +1663,7 @@ def plot2d(
     add_cbar=True,
     cbar_label=True,
     cbar_top=False,
-    **kwargs
+    **kwargs,
 ):
     global data, fig, im, cbar
     global x, y, mult_x, mult_y
@@ -1807,7 +1807,7 @@ def plot2d(
         add_cbar=add_cbar,
         cbar_label=cbar_label,
         cbar_top=cbar_top,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -1828,13 +1828,13 @@ def plot_levels(
     out=False,
     title=True,
     levels=True,
-    **kwargs
+    **kwargs,
 ):
     global data
 
     try:
         plt.clf()
-    except:
+    except Exception:
         pass
 
     if iso is None:
@@ -1882,19 +1882,19 @@ def plot_levels(
 
     if levels:
         fmt = {}
-        for l, i in zip(cs.levels, range(1, len(cs.levels) + 1)):
-            fmt[l] = str(i)
+        for level, i in zip(cs.levels, range(1, len(cs.levels) + 1)):
+            fmt[level] = str(i)
 
         sidx = ""
         slvl = ""
-        for l, i in reversed(
+        for level, i in reversed(
             list(zip(cs.levels, range(1, len(cs.levels) + 1)))
         ):
             # sidx += rtn + "%i" % i
-            # slvl += rtn + "%-6.4g" % l
+            # slvl += rtn + "%-6.4g" % level
             # rtn = "\n"
             sidx += "%i\n" % i
-            slvl += "%-6.4g\n" % l
+            slvl += "%-6.4g\n" % level
 
         t1 = TextArea("Level", textprops=dict(color="k", fontsize="small"))
         t2 = TextArea(sidx, textprops=dict(color="k", fontsize="small"))
@@ -1974,7 +1974,7 @@ def plot_contour(var, r0=None, r1=None, nl=10, iso=None, title=True, **kwargs):
         out=False,
         title=title,
         levels=False,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -1990,17 +1990,17 @@ def getdata(fname, wkd=None, verbose=True, squeeze=False):
     if isinstance(fname, int):
         try:
             filename = wkdir + "/%0.4i.sdf" % fname
-        except:
+        except Exception:
             filename = wkdir + "/" + fname
     else:
         filename = fname
 
     try:
         st = os.stat(filename)
-    except OSError as e:
+    except OSError:
         try:
             filename = "./%0.4i.sdf" % fname
-        except:
+        except Exception:
             filename = "./" + fname
         try:
             st = os.stat(filename)
@@ -2034,7 +2034,7 @@ def getdata(fname, wkd=None, verbose=True, squeeze=False):
                 for element in value.dims:
                     dims.append([0, element - 1])
                 subarray(value, dims)
-            except:
+            except Exception:
                 pass
 
     sdfdict = data._block_ids
@@ -2164,7 +2164,7 @@ def _get_grid(data, verbose=False):
                 var = vargrid.data[n]
                 dims = str(tuple(int(i) for i in vargrid.dims))
                 if verbose:
-                    print(key + dims + " = " + k)
+                    print(key + dims + " = " + var)
                 globals()[key] = var
                 builtins.__dict__[key] = var
 
@@ -2234,11 +2234,11 @@ def axis_offset(boxed=False):
     f = 1e-3
 
     # for o in ax.findobj():
-    for l in ax.get_lines():
-        bb = l.get_clip_box()
+    for line in ax.get_lines():
+        bb = line.get_clip_box()
         bb._bbox = Bbox([[-f, -f], [1 + 2 * f, 1 + 2 * f]])
-        l.set_clip_box(bb)
-        # l.set_clip_on(False)
+        line.set_clip_box(bb)
+        # line.set_clip_on(False)
 
     if boxed:
         r = matplotlib.patches.Rectangle(
@@ -2309,7 +2309,7 @@ def list_variables(data):
                     np.array2string(np.array(val.dims), separator=", "),
                 )
             )
-        except:
+        except Exception:
             pass
 
 

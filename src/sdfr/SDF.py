@@ -958,7 +958,7 @@ def read(file=None, convert=False, mmap=0, dict=False, derived=True):
 
     import warnings
 
-    if file == None:
+    if file is None:
         raise TypeError("Missing file parameter")
 
     if mmap != 0:
