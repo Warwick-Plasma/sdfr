@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .SDF import read
+from .SDF import new, read
 from . import sdf_helper
 from ._commit_info import (
     __commit_date__,
@@ -37,8 +37,9 @@ except Exception:
 
 __all__ = [
     "SDF",
-    "sdf_helper",
+    "new",
     "read",
+    "sdf_helper",
     "__library_commit_date__",
     "__library_commit_id__",
     "__version__",
