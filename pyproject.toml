@@ -30,3 +30,7 @@ version_scheme = "post-release" # Development builds are post-releases
 
 [tool.cibuildwheel]
 build = "cp38-*"
+
+[tool.ruff]
+line-length = 80
+indent-width = 4

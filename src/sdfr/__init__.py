@@ -15,9 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-_module_name = "sdfr"
-
-from .SDF import *
+from .SDF import read
 from . import sdf_helper
 from ._commit_info import (
     __commit_date__,
@@ -28,7 +26,9 @@ from .loadlib import (
     __library_commit_id__,
 )
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import version
+
+_module_name = "sdfr"
 
 try:
     __version__ = version(_module_name)
@@ -37,6 +37,8 @@ except Exception:
 
 __all__ = [
     "SDF",
+    "sdf_helper",
+    "read",
     "__library_commit_date__",
     "__library_commit_id__",
     "__version__",

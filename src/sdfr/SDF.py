@@ -17,6 +17,7 @@
 
 import ctypes as ct
 import numpy as np
+import struct
 from enum import IntEnum
 from .loadlib import sdf_lib
 
@@ -117,6 +118,17 @@ _ct_datatypes = [
     ct.c_bool,
     0,
 ]
+_st_datatypes = [
+    0,
+    "i",
+    "q",
+    "f",
+    "d",
+    "d",
+    "c",
+    "?",
+    0,
+]
 
 # Constants
 SDF_READ = 1
@@ -187,7 +199,7 @@ SdfBlock._fields_ = [
     ("ngrids", ct.c_int),
     ("offset", ct.c_int),
     ("ngb", ct.c_int * 6),
-    ("const_value", ct.c_char * 16),
+    ("const_value", ct.c_byte * 16),
     ("id", ct.c_char_p),
     ("units", ct.c_char_p),
     ("mesh_id", ct.c_char_p),
@@ -339,19 +351,64 @@ class RunInfo(ct.Structure):
 class BlockList:
     """Contains all the blocks"""
 
-    def __init__(self, filename, convert=False, derived=True):
+    def __init__(
+        self,
+        filename=None,
+        convert=False,
+        derived=True,
+        mode=SDF_READ,
+        code_name="sdfr",
+        restart=False,
+    ):
         self._handle = None
         clib = sdf_lib
         self._clib = clib
         clib.sdf_open.restype = ct.POINTER(SdfFile)
         clib.sdf_open.argtypes = [ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+        clib.sdf_new.restype = ct.POINTER(SdfFile)
+        clib.sdf_new.argtypes = [ct.c_int, ct.c_int]
         clib.sdf_stack_init.argtypes = [ct.c_void_p]
         clib.sdf_read_blocklist.argtypes = [ct.c_void_p]
         clib.sdf_read_blocklist_all.argtypes = [ct.c_void_p]
         clib.sdf_helper_read_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
         clib.sdf_free_block_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
+        clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
+        clib.sdf_close.argtypes = [ct.c_void_p]
+        clib.sdf_write.argtypes = [ct.c_void_p, ct.c_char_p]
+        clib.sdf_get_next_block.argtypes = [ct.c_void_p]
+        clib.sdf_set_namevalue.argtypes = [
+            ct.POINTER(SdfBlock),
+            ct.POINTER(ct.c_char_p),
+            ct.POINTER(ct.c_void_p),
+        ]
+        clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
+        clib.sdf_set_block_name.argtypes = [
+            ct.c_void_p,
+            ct.c_char_p,
+            ct.c_char_p,
+        ]
+        clib.sdf_set_defaults.argtypes = [
+            ct.c_void_p,
+            ct.POINTER(SdfBlock),
+        ]
+        clib.sdf_create_id.argtypes = [
+            ct.c_void_p,
+            ct.c_char_p,
+        ]
+        clib.sdf_create_id.restype = ct.POINTER(ct.c_char_p)
+        clib.sdf_create_id_array.argtypes = [
+            ct.c_void_p,
+            ct.c_int,
+            ct.POINTER(ct.c_char_p),
+        ]
+        clib.sdf_create_id_array.restype = ct.POINTER(ct.c_char_p)
 
-        h = clib.sdf_open(filename.encode("utf-8"), 0, 1, 0)
+        comm = 0
+        use_mmap = 0
+        if filename is None:
+            h = clib.sdf_new(comm, use_mmap)
+        else:
+            h = clib.sdf_open(filename.encode("utf-8"), comm, mode, use_mmap)
         if h is None or not bool(h):
             raise Exception(f"Failed to open file: '{filename}'")
 
@@ -361,12 +418,16 @@ class BlockList:
         h._clib = clib
         self._handle = h
         clib.sdf_stack_init(h)
-        if derived:
-            clib.sdf_read_blocklist_all(h)
+        if mode == SDF_READ:
+            if derived:
+                clib.sdf_read_blocklist_all(h)
+            else:
+                clib.sdf_read_blocklist(h)
         else:
-            clib.sdf_read_blocklist(h)
+            clib.sdf_set_code_name(h, code_name.encode("utf-8"))
 
         block = h.contents.blocklist
+        h.contents.restart_flag = restart
         self.Header = get_header(h.contents)
         mesh_id_map = {}
         mesh_vars = []
@@ -486,11 +547,270 @@ class BlockList:
 
     def __del__(self):
         if self._handle:
-            self._clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
-            self._clib.sdf_close.argtypes = [ct.c_void_p]
             self._clib.sdf_stack_destroy(self._handle)
             self._clib.sdf_close(self._handle)
             self._handle = None
+
+    def write(self, filename):
+        if not self._handle:
+            return
+        self._clib.sdf_write(self._handle, filename.encode())
+
+    def _set_block_name(self, id, name):
+        self._clib.sdf_set_block_name(
+            self._handle, id.encode("utf-8"), name.encode("utf-8")
+        )
+
+    def _create_id(self, values):
+        tmp = self._clib.sdf_create_id(self._handle, values.encode("utf-8"))
+        return ct.cast(tmp, ct.c_char_p)
+
+    def _string_array_ctype(self, values):
+        strings = [s.encode("utf-8") for s in values]
+        strings = [ct.create_string_buffer(s) for s in strings]
+        strings = [ct.cast(s, ct.c_char_p) for s in strings]
+        strings = (ct.c_char_p * len(values))(*strings)
+        return strings
+
+    def _create_id_array(self, values):
+        values = self._string_array_ctype(values)
+        res = self._clib.sdf_create_id_array(self._handle, len(values), values)
+        return res
+
+    def _add_preamble(self, id, name, datatype):
+        self._clib.sdf_get_next_block(self._handle)
+        h = self._handle.contents
+        h.nblocks += 1
+        h.nblocks_file += 1
+        block = h.current_block.contents
+        block._handle = self._handle
+        block._blocklist = h.blocklist
+        block._data = None
+        block.datatype = datatype
+        block.in_file = 1
+        block.AddBlock = None
+        self._set_block_name(id, name)
+        return h, block
+
+    def _add_post(self, block):
+        if block.AddBlock:
+            newblock = block.AddBlock(block)
+        else:
+            return
+
+        id = block.id.decode()
+        name = block.name.decode()
+        if not block.dont_display:
+            self.__dict__[name] = newblock
+        if block._data is not None:
+            newblock._data = block._data
+        self._block_ids.update({id: newblock})
+        self._block_names.update({name: newblock})
+
+    def _add_constant(self, name, value=0, datatype=None, id=None):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value)}')
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+        block.AddBlock = BlockConstant
+
+        const_value = struct.pack(_st_datatypes[block.datatype], value)
+        ct.memmove(block.const_value, const_value, 16)
+
+        self._add_post(block)
+
+    def _add_namevalue(self, name, value={}, datatype=None, id=None):
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+        block.AddBlock = BlockNameValue
+
+        nvalue = len(value)
+        block.ndims = nvalue
+        ctype = _ct_datatypes[block.datatype]
+        if block.datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            vals = self._string_array_ctype(value.values())
+        else:
+            vals = (ctype * nvalue)(*value.values())
+        names = self._string_array_ctype(value.keys())
+        vals = ct.cast(vals, ct.POINTER(ct.c_void_p))
+        self._clib.sdf_set_namevalue(block, names, vals)
+
+        self._add_post(block)
+
+    def _add_array(self, name, value=(), datatype=None, id=None):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_ARRAY
+        block.AddBlock = BlockArray
+
+        block._data = np.array(value)
+        block.ndims = block._data.ndim
+        for i in range(block.ndims):
+            block.dims[i] = block._data.shape[i]
+        block.data = block._data.ctypes.data_as(ct.c_void_p)
+
+        self._add_post(block)
+
+    def _add_plainvar(
+        self,
+        name,
+        value=(),
+        datatype=None,
+        id=None,
+        mult=None,
+        units=None,
+        mesh_id=None,
+        stagger=None,
+    ):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
+            return
+        try:
+            mult = float(mult)
+        except Exception:
+            if mult is not None:
+                print(f"ERROR: unable to use mult parameter, {mult}")
+                return
+        try:
+            stagger = SdfStagger(stagger)
+        except Exception:
+            if stagger is not None:
+                print(f"ERROR: unable to use stagger parameter, {stagger}")
+                return
+        if units is not None and not isinstance(units, str):
+            print(f"ERROR: unable to use units parameter, {units}")
+            return
+        if mesh_id is not None and not isinstance(mesh_id, str):
+            print(f"ERROR: unable to use mesh_id parameter, {mesh_id}")
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE
+        block.AddBlock = BlockPlainVariable
+
+        block._data = np.array(value, order="F")
+        block.ndims = block._data.ndim
+        for i in range(block.ndims):
+            block.dims[i] = block._data.shape[i]
+        block.data = block._data.ctypes.data_as(ct.c_void_p)
+        if mult is not None:
+            block.mult = mult
+        if isinstance(units, str):
+            block.units = self._create_id(units)
+        if isinstance(mesh_id, str):
+            block.mesh_id = self._create_id(mesh_id)
+        if stagger:
+            block.stagger = stagger
+
+        self._clib.sdf_set_defaults(self._handle, block)
+        self._add_post(block)
+
+    def _add_mesh(
+        self,
+        name,
+        value=None,
+        datatype=None,
+        id=None,
+        units=None,
+        labels=None,
+        geometry=None,
+        **kwargs,
+    ):
+        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
+            return
+
+        h, block = self._add_preamble(id, name, datatype)
+
+        keys = ["x", "y", "z"]
+        keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+        val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+
+        block._data = [np.array(kwargs[k], dtype=val.dtype) for k in keys]
+        block._data = [np.array(row, order="F") for row in block._data]
+        block._data = tuple(block._data)
+        block.ndims = len(block._data)
+        block.ngrids = block.ndims
+        grids = [row.ctypes.data_as(ct.c_void_p) for row in block._data]
+        block.grids = (ct.c_void_p * block.ngrids)(*grids)
+        if block._data[0].ndim == 1:
+            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH
+            block.AddBlock = BlockPlainMesh
+            for i in range(block.ndims):
+                block.dims[i] = block._data[i].shape[0]
+        else:
+            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH
+            block.AddBlock = BlockLagrangianMesh
+            for i in range(block.ndims):
+                block.dims[i] = block._data[0].shape[i]
+        if isinstance(units, (list, tuple)):
+            block.dim_units = self._create_id_array(units)
+        if isinstance(labels, (list, tuple)):
+            block.dim_labels = self._create_id_array(labels)
+        if isinstance(geometry, str):
+            if geometry == "rz":
+                geometry = SdfGeometry.SDF_GEOMETRY_CYLINDRICAL
+        if isinstance(geometry, int):
+            block.geometry = geometry
+
+        self._clib.sdf_set_defaults(self._handle, block)
+        self._add_post(block)
+
+    def add_block(self, name, value=None, id=None, **kwargs):
+        if isinstance(value, dict):
+            val = next(iter(value.values()), None)
+            add_func = self._add_namevalue
+        elif isinstance(value, (tuple, list, np.ndarray)):
+            arr = np.array(value)
+            if arr.ndim == 1:
+                val = value[0]
+                add_func = self._add_array
+            else:
+                val = arr.flatten()[0]
+                add_func = self._add_plainvar
+        elif value is not None:
+            val = value
+            add_func = self._add_constant
+        else:
+            keys = ["x", "y", "z"]
+            keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+            val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+            add_func = self._add_mesh
+            if id is None:
+                id = "grid"
+
+        if id is None:
+            id = name
+        if id in self._block_ids:
+            print(f'Unable to create block. ID duplicated: "{id}"')
+            return
+
+        datatype = None
+        if isinstance(val, bool):
+            datatype = SdfDataType.SDF_DATATYPE_LOGICAL
+        elif isinstance(val, np.int32):
+            datatype = SdfDataType.SDF_DATATYPE_INTEGER4
+        elif isinstance(val, (int, np.int64)):
+            datatype = SdfDataType.SDF_DATATYPE_INTEGER8
+        elif isinstance(val, np.float32):
+            datatype = SdfDataType.SDF_DATATYPE_REAL4
+        elif isinstance(val, float):
+            datatype = SdfDataType.SDF_DATATYPE_REAL8
+        elif isinstance(val, str):
+            datatype = SdfDataType.SDF_DATATYPE_CHARACTER
+        else:
+            add_func = None
+
+        if add_func:
+            add_func(name, value=value, id=id, datatype=datatype, **kwargs)
+        else:
+            print(f'Block "{id}", unsupported datatype: {type(value)}')
+            return
 
     @property
     def name_dict(self):
@@ -889,10 +1209,12 @@ class BlockStitchedTensor(BlockStitched):
 
 def get_header(h):
     d = {}
-    d["filename"] = h.filename.decode()
+    if h.filename:
+        d["filename"] = h.filename.decode()
     d["file_version"] = h.file_version
     d["file_revision"] = h.file_revision
-    d["code_name"] = h.code_name.decode()
+    if h.code_name:
+        d["code_name"] = h.code_name.decode()
     d["step"] = h.step
     d["time"] = h.time
     d["jobid1"] = h.jobid1
@@ -958,13 +1280,33 @@ def read(file=None, convert=False, mmap=0, dict=False, derived=True):
 
     import warnings
 
-    if file == None:
+    if file is None:
         raise TypeError("Missing file parameter")
 
     if mmap != 0:
         warnings.warn("mmap flag ignored")
 
     blocklist = BlockList(file, convert, derived)
+
+    if isinstance(dict, str):
+        if dict == "id" or dict == "ids":
+            return blocklist._block_ids
+    elif isinstance(dict, bool) and dict:
+        return blocklist._block_names
+
+    return blocklist
+
+
+def new(dict=False, code_name="sdfr", restart=False):
+    """Creates a new SDF blocklist and returns a dictionary of NumPy arrays.
+
+    Parameters
+    ----------
+    dict : bool, optional
+        Return file contents as a dictionary rather than member names.
+    """
+
+    blocklist = BlockList(mode=SDF_WRITE, code_name=code_name, restart=restart)
 
     if isinstance(dict, str):
         if dict == "id" or dict == "ids":
