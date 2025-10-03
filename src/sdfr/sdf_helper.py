@@ -34,6 +34,7 @@ except Exception:
 
 try:
     import sdfr as sdf
+    import sdfr.SDF as SDF
 
     got_sdf = True
 except ImportError:
@@ -257,7 +258,7 @@ def get_file_list(wkd=None, base=None, block=None):
         automatically attempt to detect if this field is base or block
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
 
     Returns
@@ -276,8 +277,8 @@ def get_file_list(wkd=None, base=None, block=None):
         elif os.path.exists(wkd):
             base = wkd
         elif (
-            isinstance(wkd, sdf.BlockList)
-            or isinstance(wkd, sdf.Block)
+            isinstance(wkd, SDF.BlockList)
+            or isinstance(wkd, SDF.Block)
             or type(wkd) is dict
         ):
             block = wkd
@@ -319,7 +320,7 @@ def get_job_id(file_list=None, base=None, block=None):
         automatically attempt to detect if this field is base or block
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
 
     Returns
@@ -333,8 +334,8 @@ def get_job_id(file_list=None, base=None, block=None):
             base = file_list
             file_list = None
         elif (
-            isinstance(file_list, sdf.BlockList)
-            or isinstance(file_list, sdf.Block)
+            isinstance(file_list, SDF.BlockList)
+            or isinstance(file_list, SDF.Block)
             or type(file_list) is dict
         ):
             block = file_list
@@ -381,7 +382,7 @@ def get_files(wkd=None, base=None, block=None, varname=None, fast=True):
         automatically attempt to detect if this field is base or block
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
     varname : str
         A variable name that must be present in the file
@@ -401,8 +402,8 @@ def get_files(wkd=None, base=None, block=None, varname=None, fast=True):
         elif os.path.exists(wkd):
             base = wkd
         elif (
-            isinstance(wkd, sdf.BlockList)
-            or isinstance(wkd, sdf.Block)
+            isinstance(wkd, SDF.BlockList)
+            or isinstance(wkd, SDF.Block)
             or type(wkd) is dict
         ):
             block = wkd
@@ -461,14 +462,14 @@ def get_time(
         The directory in which to search
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
     fast : bool
         Use a faster but less thorough method for returning first/last
 
     Returns
     -------
-    data : sdf.BlockList
+    data : SDF.BlockList
         An SDF dataset
     """
     global data, wkdir
@@ -551,14 +552,14 @@ def get_step(
         The directory in which to search
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
     fast : bool
         Use a faster but less thorough method for returning first/last
 
     Returns
     -------
-    data : sdf.BlockList
+    data : SDF.BlockList
         An SDF dataset
     """
     global data, wkdir
@@ -632,12 +633,12 @@ def get_latest(wkd=None, base=None, block=None):
         automatically attempt to detect if this field is base or block
     base : str
         A representative filename or directory
-    block : sdf.Block or sdf.BlockList
+    block : SDF.Block or SDF.BlockList
         A representative sdf dataset or block
 
     Returns
     -------
-    data : sdf.BlockList
+    data : SDF.BlockList
         An SDF dataset
     """
     return get_step(last=True, wkd=wkd, base=base, block=base)
@@ -715,9 +716,9 @@ def plot_auto(*args, **kwargs):
         )
         return
     if len(dims) == 1:
-        if isinstance(args[0], sdf.BlockStitchedPath):
+        if isinstance(args[0], SDF.BlockStitchedPath):
             plot_rays(*args, **kwargs)
-        elif isinstance(args[0], sdf.BlockStitched):
+        elif isinstance(args[0], SDF.BlockStitched):
             newargs = list(args[:])
             for block in args[0].data:
                 newargs[0] = block
@@ -728,9 +729,9 @@ def plot_auto(*args, **kwargs):
             if isinstance(args[0], SDF.BlockPointVariable):
                 kwargs["add_lines"] = False
             plot_path(*args, **kwargs)
-    elif isinstance(args[0], sdf.BlockLagrangianMesh) and dims[1] == 1:
+    elif isinstance(args[0], SDF.BlockLagrangianMesh) and dims[1] == 1:
         plot_path(*args, **kwargs)
-    elif isinstance(args[0], sdf.BlockStitchedPath):
+    elif isinstance(args[0], SDF.BlockStitchedPath):
         plot_rays(*args, **kwargs)
     elif len(dims) == 2:
         k = "set_ylabel"
@@ -922,7 +923,7 @@ def plot_path(
 
     Parameters
     ----------
-    var : sdf.Block
+    var : SDF.Block
         The SDF block for the path to plot
     xdir : integer
         The dimension to use for the x-direction. If the path is 2D then
@@ -966,7 +967,7 @@ def plot_path(
         If set to true then update the axis limits for this path
     axis_only : logical
         If set to true then only update the axis limits for this path
-    svar : sdf.Block
+    svar : SDF.Block
         If set, use the extents of this variable to set the axis range for
         this plot
     clip_reflect : logical
@@ -1005,7 +1006,7 @@ def plot_path(
         return
 
     isvar = True
-    if isinstance(var, sdf.BlockLagrangianMesh):
+    if isinstance(var, SDF.BlockLagrangianMesh):
         isvar = False
         add_cbar = False
 
@@ -1276,7 +1277,7 @@ def plot_rays(var, skip=1, rays=None, **kwargs):
 
     Parameters
     ----------
-    var : sdf.Block
+    var : SDF.Block
         The SDF variable for the rays to plot
     rays : list
         A list of ray numbers to plot
@@ -1304,13 +1305,13 @@ def plot_rays(var, skip=1, rays=None, **kwargs):
 
         ray_slice = slice(ray_start, ray_stop, skip)
 
-    if isinstance(var, sdf.BlockStitchedPath):
+    if isinstance(var, SDF.BlockStitchedPath):
         v = var.data[0]
         lab = "_label"
         if lab not in kwargs:
             kwargs[lab] = var.name
 
-        if isinstance(v, sdf.BlockStitchedPath):
+        if isinstance(v, SDF.BlockStitchedPath):
             for v in var.data:
                 plot_rays(v, skip=skip, rays=rays, **kwargs)
                 kwargs["hold"] = True
@@ -1321,7 +1322,7 @@ def plot_rays(var, skip=1, rays=None, **kwargs):
         else:
             ray_list = var.data[ray_slice]
 
-        if not isinstance(v, sdf.BlockLagrangianMesh):
+        if not isinstance(v, SDF.BlockLagrangianMesh):
             k = "cbar_label"
             if k not in kwargs or (
                 kwargs[k] and not isinstance(kwargs[k], str)
@@ -2126,8 +2127,8 @@ def getdata(fname, wkd=None, verbose=True, squeeze=False):
 
     # Export particle arrays
     for k, value in data.__dict__.items():
-        if not isinstance(value, sdf.BlockPointVariable) and not isinstance(
-            value, sdf.BlockPointMesh
+        if not isinstance(value, SDF.BlockPointVariable) and not isinstance(
+            value, SDF.BlockPointMesh
         ):
             continue
         key = re.sub(r"[^a-z0-9]", "_", value.id.lower())
@@ -2136,7 +2137,7 @@ def getdata(fname, wkd=None, verbose=True, squeeze=False):
         else:
             var = value
         dims = str(tuple(int(i) for i in value.dims))
-        if isinstance(value, sdf.BlockPointVariable):
+        if isinstance(value, SDF.BlockPointVariable):
             if verbose:
                 print(key + dims + " = " + value.name)
             globals()[key] = var
@@ -2208,7 +2209,7 @@ def ogrid(skip=None, **kwargs):
 def plotgrid(fname=None, iso=None, title=True):
     global grid
     if (
-        isinstance(fname, sdf.BlockList)
+        isinstance(fname, SDF.BlockList)
         or isinstance(fname, dict)
         or hasattr(fname, "grid")
     ):
