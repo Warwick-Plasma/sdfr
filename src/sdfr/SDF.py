@@ -676,10 +676,6 @@ class BlockList:
         self._block_names.update({name: newblock})
 
     def _add_constant(self, name, value=0, datatype=None, id=None):
-        if datatype == SdfDataType.CHARACTER:
-            print(f'Block "{id}", unsupported datatype: {type(value)}')
-            return
-
         h, block = self._add_preamble(id, name, datatype)
         block.blocktype = SdfBlockType.CONSTANT
         block.AddBlock = BlockConstant
@@ -708,10 +704,6 @@ class BlockList:
         self._add_post(block)
 
     def _add_array(self, name, value=(), datatype=None, id=None):
-        if datatype == SdfDataType.CHARACTER:
-            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
-            return
-
         h, block = self._add_preamble(id, name, datatype)
         block.blocktype = SdfBlockType.ARRAY
         block.AddBlock = BlockArray
@@ -735,9 +727,6 @@ class BlockList:
         mesh_id=None,
         stagger=None,
     ):
-        if datatype == SdfDataType.CHARACTER:
-            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
-            return
         try:
             mult = float(mult)
         except Exception:
@@ -789,10 +778,6 @@ class BlockList:
         geometry=None,
         **kwargs,
     ):
-        if datatype == SdfDataType.CHARACTER:
-            print(f'Block "{id}", unsupported datatype: {type(value[0])}')
-            return
-
         h, block = self._add_preamble(id, name, datatype)
 
         keys = ["x", "y", "z"]
@@ -873,6 +858,8 @@ class BlockList:
             datatype = SdfDataType.REAL8
         elif isinstance(val, str):
             datatype = SdfDataType.CHARACTER
+            if add_func != self._add_namevalue:
+                add_func = None
         else:
             add_func = None
 
