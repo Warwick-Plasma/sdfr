@@ -742,6 +742,7 @@ class BlockList:
         units=None,
         mesh_id=None,
         stagger=None,
+        species=None,
     ):
         try:
             mult = float(mult)
@@ -763,11 +764,18 @@ class BlockList:
             return
 
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.PLAIN_VARIABLE
-        block.AddBlock = BlockPlainVariable
 
         block._data = _np.array(value, order="F")
         block.ndims = block._data.ndim
+
+        if block.ndims == 1 and isinstance(species, str):
+            block.blocktype = SdfBlockType.POINT_VARIABLE
+            block.AddBlock = BlockPointVariable
+            block.material_id = self._create_id(species)
+        else:
+            block.blocktype = SdfBlockType.PLAIN_VARIABLE
+            block.AddBlock = BlockPlainVariable
+
         for i in range(block.ndims):
             block.dims[i] = block._data.shape[i]
         block.data = block._data.ctypes.data_as(_c.c_void_p)
@@ -792,6 +800,7 @@ class BlockList:
         units=None,
         labels=None,
         geometry=None,
+        species=None,
         **kwargs,
     ):
         h, block = self._add_preamble(id, name, datatype)
@@ -812,6 +821,10 @@ class BlockList:
             block.AddBlock = BlockPlainMesh
             for i in range(block.ndims):
                 block.dims[i] = block._data[i].shape[0]
+            if isinstance(species, str):
+                block.blocktype = SdfBlockType.POINT_MESH
+                block.AddBlock = BlockPointMesh
+                block.material_id = self._create_id(species)
         else:
             block.blocktype = SdfBlockType.LAGRANGIAN_MESH
             block.AddBlock = BlockLagrangianMesh
@@ -839,7 +852,10 @@ class BlockList:
             arr = _np.array(value)
             if arr.ndim == 1:
                 val = value[0]
-                add_func = self._add_array
+                if "species" in kwargs:
+                    add_func = self._add_plainvar
+                else:
+                    add_func = self._add_array
             else:
                 val = arr.flatten()[0]
                 add_func = self._add_plainvar
@@ -853,7 +869,11 @@ class BlockList:
                 val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
                 add_func = self._add_mesh
                 if id is None:
-                    id = "grid"
+                    k = "species"
+                    if k in kwargs:
+                        id = f"grid/{kwargs[k]}"
+                    else:
+                        id = "grid"
 
         if id is None:
             id = name
