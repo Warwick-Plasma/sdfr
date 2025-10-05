@@ -762,6 +762,7 @@ class BlockList:
         self._add_post(block)
 
     def add_block(self, name, value=None, id=None, **kwargs):
+        add_func = None
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
             add_func = self._add_namevalue
@@ -779,10 +780,11 @@ class BlockList:
         else:
             keys = ["x", "y", "z"]
             keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
-            val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
-            add_func = self._add_mesh
-            if id is None:
-                id = "grid"
+            if len(keys) > 0:
+                val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+                add_func = self._add_mesh
+                if id is None:
+                    id = "grid"
 
         if id is None:
             id = name
