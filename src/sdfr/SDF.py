@@ -869,6 +869,153 @@ class BlockList:
         self._clib.sdf_set_defaults(self._handle, block)
         self._add_post(block)
 
+    def add_stitched(
+        self,
+        name,
+        value={},
+        id=None,
+        mesh_id=None,
+        btype=None,
+        datatype=None,
+        stagger=SdfStagger.HIDDEN0,
+        material_id=None,
+        material_name=None,
+        material_names=None,
+    ):
+        if not isinstance(value, (list, tuple)):
+            print("ERROR: invalid value supplied for stitched block")
+            return
+        if not isinstance(mesh_id, str):
+            found_mesh = None
+            warn = True
+            for val in value:
+                if val in self._block_ids:
+                    tmp = self._block_ids[val]._contents.mesh_id
+                    if isinstance(tmp, bytes):
+                        tmp = tmp.decode()
+                        if (
+                            warn
+                            and found_mesh is not None
+                            and found_mesh != tmp
+                        ):
+                            print(
+                                "WARNING: stitched blocks on different meshes"
+                            )
+                            warn = False
+                        found_mesh = tmp
+                else:
+                    print(
+                        f'WARNING: stitched id "{val}" not found in blocklist'
+                    )
+            if found_mesh is not None:
+                mesh_id = found_mesh
+            else:
+                print("ERROR: no mesh_id supplied for stitched block")
+                return
+        if id is None:
+            id = name
+        if datatype is None:
+            datatype = SdfDataType.NULL
+        h, block = self._add_preamble(id, name, datatype)
+
+        if btype is None:
+            btype = SdfBlockType.STITCHED
+        block.blocktype = btype
+
+        if btype in (
+            SdfBlockType.CONTIGUOUS_TENSOR,
+            SdfBlockType.STITCHED_TENSOR,
+        ):
+            block.AddBlock = BlockStitchedTensor
+        elif btype in (
+            SdfBlockType.CONTIGUOUS_MATERIAL,
+            SdfBlockType.STITCHED_MATERIAL,
+        ):
+            block.AddBlock = BlockStitchedMaterial
+            block.material_names = self._create_string_array(material_names)
+        elif btype in (
+            SdfBlockType.CONTIGUOUS_MATVAR,
+            SdfBlockType.STITCHED_MATVAR,
+        ):
+            block.AddBlock = BlockStitchedMatvar
+            block.material_id = self._create_id(material_id)
+        elif btype in (
+            SdfBlockType.CONTIGUOUS_SPECIES,
+            SdfBlockType.STITCHED_SPECIES,
+        ):
+            block.AddBlock = BlockStitchedSpecies
+            block.material_id = self._create_id(material_id)
+            block.material_name = self._create_string(material_name)
+            block.material_names = self._create_id_array(material_names)
+        else:
+            if stagger in (SdfStagger.HIDDEN0, SdfStagger.HIDDEN2):
+                block.AddBlock = BlockStitchedPath
+            else:
+                block.AddBlock = BlockStitched
+
+        block.stagger = stagger
+        nvalue = len(value)
+        block.ndims = nvalue
+        block.mesh_id = self._create_id(mesh_id)
+        block.variable_ids = self._create_id_array(value)
+        block._blocklist._block_ids = self._block_ids
+
+        self._add_post(block)
+
+    def add_stitched_vector(self, name, value={}, id=None, mesh_id=None):
+        return self.add_stitched(
+            name,
+            value,
+            id,
+            mesh_id,
+            btype=SdfBlockType.STITCHED_TENSOR,
+        )
+
+    def add_stitched_material(
+        self, name, value={}, id=None, mesh_id=None, material_names=None
+    ):
+        return self.add_stitched(
+            name,
+            value,
+            id,
+            mesh_id,
+            material_names=material_names,
+            btype=SdfBlockType.STITCHED_MATERIAL,
+        )
+
+    def add_stitched_matvar(
+        self, name, value={}, id=None, mesh_id=None, material_id=None
+    ):
+        return self.add_stitched(
+            name,
+            value,
+            id,
+            mesh_id,
+            material_id=material_id,
+            btype=SdfBlockType.STITCHED_MATVAR,
+        )
+
+    def add_stitched_species(
+        self,
+        name,
+        value={},
+        id=None,
+        mesh_id=None,
+        material_id=None,
+        material_name=None,
+        material_names=None,
+    ):
+        return self.add_stitched(
+            name,
+            value,
+            id,
+            mesh_id,
+            material_id=material_id,
+            material_name=material_name,
+            material_names=material_names,
+            btype=SdfBlockType.STITCHED_SPECIES,
+        )
+
     def add_block(self, name, value=None, id=None, **kwargs):
         add_func = None
         if isinstance(value, dict):
@@ -878,7 +1025,9 @@ class BlockList:
             arr = _np.array(value)
             if arr.ndim == 1:
                 val = value[0]
-                if "species" in kwargs:
+                if isinstance(arr[0], str):
+                    add_func = self.add_stitched
+                elif "species" in kwargs or "mesh_id" in kwargs:
                     add_func = self._add_plainvar
                 else:
                     add_func = self._add_array
@@ -920,7 +1069,10 @@ class BlockList:
             datatype = SdfDataType.REAL8
         elif isinstance(val, str):
             datatype = SdfDataType.CHARACTER
-            if add_func != self._add_namevalue:
+            if (
+                add_func != self._add_namevalue
+                and add_func != self.add_stitched
+            ):
                 add_func = None
         else:
             add_func = None
