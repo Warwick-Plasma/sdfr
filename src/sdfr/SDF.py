@@ -830,8 +830,12 @@ class BlockList:
             block.AddBlock = BlockLagrangianMesh
             for i in range(block.ndims):
                 block.dims[i] = block._data[0].shape[i]
+        if isinstance(units, str):
+            units = (units,)
         if isinstance(units, (list, tuple)):
             block.dim_units = self._create_id_array(units)
+        if isinstance(labels, str):
+            labels = (labels,)
         if isinstance(labels, (list, tuple)):
             block.dim_labels = self._create_id_array(labels)
         if isinstance(geometry, str):
