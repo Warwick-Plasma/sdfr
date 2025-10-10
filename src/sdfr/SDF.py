@@ -32,67 +32,75 @@ from .loadlib import sdf_lib
 
 # Enum representation using ct
 class SdfBlockType(IntEnum):
-    SDF_BLOCKTYPE_SCRUBBED = -1
-    SDF_BLOCKTYPE_NULL = 0
-    SDF_BLOCKTYPE_PLAIN_MESH = 1
-    SDF_BLOCKTYPE_POINT_MESH = 2
-    SDF_BLOCKTYPE_PLAIN_VARIABLE = 3
-    SDF_BLOCKTYPE_POINT_VARIABLE = 4
-    SDF_BLOCKTYPE_CONSTANT = 5
-    SDF_BLOCKTYPE_ARRAY = 6
-    SDF_BLOCKTYPE_RUN_INFO = 7
-    SDF_BLOCKTYPE_SOURCE = 8
-    SDF_BLOCKTYPE_STITCHED_TENSOR = 9
-    SDF_BLOCKTYPE_STITCHED_MATERIAL = 10
-    SDF_BLOCKTYPE_STITCHED_MATVAR = 11
-    SDF_BLOCKTYPE_STITCHED_SPECIES = 12
-    SDF_BLOCKTYPE_SPECIES = 13
-    SDF_BLOCKTYPE_PLAIN_DERIVED = 14
-    SDF_BLOCKTYPE_POINT_DERIVED = 15
-    SDF_BLOCKTYPE_CONTIGUOUS_TENSOR = 16
-    SDF_BLOCKTYPE_CONTIGUOUS_MATERIAL = 17
-    SDF_BLOCKTYPE_CONTIGUOUS_MATVAR = 18
-    SDF_BLOCKTYPE_CONTIGUOUS_SPECIES = 19
-    SDF_BLOCKTYPE_CPU_SPLIT = 20
-    SDF_BLOCKTYPE_STITCHED_OBSTACLE_GROUP = 21
-    SDF_BLOCKTYPE_UNSTRUCTURED_MESH = 22
-    SDF_BLOCKTYPE_STITCHED = 23
-    SDF_BLOCKTYPE_CONTIGUOUS = 24
-    SDF_BLOCKTYPE_LAGRANGIAN_MESH = 25
-    SDF_BLOCKTYPE_STATION = 26
-    SDF_BLOCKTYPE_STATION_DERIVED = 27
-    SDF_BLOCKTYPE_DATABLOCK = 28
-    SDF_BLOCKTYPE_NAMEVALUE = 29
+    SCRUBBED = -1
+    NULL = 0
+    PLAIN_MESH = 1
+    POINT_MESH = 2
+    PLAIN_VARIABLE = 3
+    POINT_VARIABLE = 4
+    CONSTANT = 5
+    ARRAY = 6
+    RUN_INFO = 7
+    SOURCE = 8
+    STITCHED_TENSOR = 9
+    STITCHED_MATERIAL = 10
+    STITCHED_MATVAR = 11
+    STITCHED_SPECIES = 12
+    SPECIES = 13
+    PLAIN_DERIVED = 14
+    POINT_DERIVED = 15
+    CONTIGUOUS_TENSOR = 16
+    CONTIGUOUS_MATERIAL = 17
+    CONTIGUOUS_MATVAR = 18
+    CONTIGUOUS_SPECIES = 19
+    CPU_SPLIT = 20
+    STITCHED_OBSTACLE_GROUP = 21
+    UNSTRUCTURED_MESH = 22
+    STITCHED = 23
+    CONTIGUOUS = 24
+    LAGRANGIAN_MESH = 25
+    STATION = 26
+    STATION_DERIVED = 27
+    DATABLOCK = 28
+    NAMEVALUE = 29
 
 
 class SdfGeometry(IntEnum):
-    SDF_GEOMETRY_NULL = 0
-    SDF_GEOMETRY_CARTESIAN = 1
-    SDF_GEOMETRY_CYLINDRICAL = 2
-    SDF_GEOMETRY_SPHERICAL = 3
+    NULL = 0
+    CARTESIAN = 1
+    CYLINDRICAL = 2
+    SPHERICAL = 3
 
 
 class SdfStagger(IntEnum):
-    SDF_STAGGER_CELL_CENTRE = 0
-    SDF_STAGGER_FACE_X = 1
-    SDF_STAGGER_FACE_Y = 2
-    SDF_STAGGER_FACE_Z = 3
-    SDF_STAGGER_EDGE_X = 4
-    SDF_STAGGER_EDGE_Y = 5
-    SDF_STAGGER_EDGE_Z = 6
-    SDF_STAGGER_VERTEX = 7
+    CELL_CENTRE = 0
+    FACE_X = 1
+    FACE_Y = 2
+    FACE_Z = 3
+    EDGE_X = 4
+    EDGE_Y = 5
+    EDGE_Z = 6
+    VERTEX = 7
+    HIDDEN0 = 10
+    HIDDEN1 = 11
+    HIDDEN2 = 12
 
 
 class SdfDataType(IntEnum):
-    SDF_DATATYPE_NULL = 0
-    SDF_DATATYPE_INTEGER4 = 1
-    SDF_DATATYPE_INTEGER8 = 2
-    SDF_DATATYPE_REAL4 = 3
-    SDF_DATATYPE_REAL8 = 4
-    SDF_DATATYPE_REAL16 = 5
-    SDF_DATATYPE_CHARACTER = 6
-    SDF_DATATYPE_LOGICAL = 7
-    SDF_DATATYPE_OTHER = 8
+    NULL = 0
+    INTEGER4 = 1
+    INTEGER8 = 2
+    REAL4 = 3
+    REAL8 = 4
+    REAL16 = 5
+    CHARACTER = 6
+    LOGICAL = 7
+    OTHER = 8
+
+
+class SdfMode(IntEnum):
+    READ = 1
+    WRITE = 2
 
 
 _np_datatypes = [
@@ -131,8 +139,6 @@ _st_datatypes = [
 ]
 
 # Constants
-SDF_READ = 1
-SDF_WRITE = 2
 SDF_MAXDIMS = 4
 
 
@@ -356,7 +362,7 @@ class BlockList:
         filename=None,
         convert=False,
         derived=True,
-        mode=SDF_READ,
+        mode=SdfMode.READ,
         code_name="sdfr",
         restart=False,
     ):
@@ -418,7 +424,7 @@ class BlockList:
         h._clib = clib
         self._handle = h
         clib.sdf_stack_init(h)
-        if mode == SDF_READ:
+        if mode == SdfMode.READ:
             if derived:
                 clib.sdf_read_blocklist_all(h)
             else:
@@ -441,72 +447,72 @@ class BlockList:
             newblock = None
             newblock_mid = None
             name = get_member_name(block.name)
-            if blocktype == SdfBlockType.SDF_BLOCKTYPE_ARRAY:
+            if blocktype == SdfBlockType.ARRAY:
                 newblock = BlockArray(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_CONSTANT:
+            elif blocktype == SdfBlockType.CONSTANT:
                 newblock = BlockConstant(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED
+                blocktype == SdfBlockType.CONTIGUOUS
+                or blocktype == SdfBlockType.STITCHED
             ):
-                if block.stagger == 10 or block.stagger == 12:
+                if block.stagger in (SdfStagger.HIDDEN0, SdfStagger.HIDDEN2):
                     newblock = BlockStitchedPath(block)
                 else:
                     newblock = BlockStitched(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATERIAL
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATERIAL
+                blocktype == SdfBlockType.CONTIGUOUS_MATERIAL
+                or blocktype == SdfBlockType.STITCHED_MATERIAL
             ):
                 newblock = BlockStitchedMaterial(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_MATVAR
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_MATVAR
+                blocktype == SdfBlockType.CONTIGUOUS_MATVAR
+                or blocktype == SdfBlockType.STITCHED_MATVAR
             ):
                 newblock = BlockStitchedMatvar(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_SPECIES
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_SPECIES
+                blocktype == SdfBlockType.CONTIGUOUS_SPECIES
+                or blocktype == SdfBlockType.STITCHED_SPECIES
             ):
                 newblock = BlockStitchedSpecies(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_CONTIGUOUS_TENSOR
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_STITCHED_TENSOR
+                blocktype == SdfBlockType.CONTIGUOUS_TENSOR
+                or blocktype == SdfBlockType.STITCHED_TENSOR
             ):
                 newblock = BlockStitchedTensor(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_DATABLOCK:
+            elif blocktype == SdfBlockType.DATABLOCK:
                 newblock = BlockData(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
+            elif blocktype == SdfBlockType.LAGRANGIAN_MESH:
                 if block.datatype_out != 0:
                     newblock = BlockLagrangianMesh(block)
                     newblock_mid = block
                     newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE:
+            elif blocktype == SdfBlockType.NAMEVALUE:
                 newblock = BlockNameValue(block)
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_DERIVED
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE
+                blocktype == SdfBlockType.PLAIN_DERIVED
+                or blocktype == SdfBlockType.PLAIN_VARIABLE
             ):
                 newblock = BlockPlainVariable(block)
                 mesh_vars.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
+            elif blocktype == SdfBlockType.PLAIN_MESH:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
                     newblock_mid = block
                     newblock_mid._grid_block = newblock
                     mesh_id_map[newblock.id] = newblock
             elif (
-                blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_DERIVED
-                or blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_VARIABLE
+                blocktype == SdfBlockType.POINT_DERIVED
+                or blocktype == SdfBlockType.POINT_VARIABLE
             ):
                 newblock = BlockPointVariable(block)
                 mesh_vars.append(newblock)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_POINT_MESH:
+            elif blocktype == SdfBlockType.POINT_MESH:
                 newblock = BlockPointMesh(block)
                 mesh_id_map[newblock.id] = newblock
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_RUN_INFO:
+            elif blocktype == SdfBlockType.RUN_INFO:
                 self.Run_info = get_run_info(block)
-            elif blocktype == SdfBlockType.SDF_BLOCKTYPE_STATION:
+            elif blocktype == SdfBlockType.STATION:
                 sdict = BlockStation(block, name)
                 self.__dict__.update({"StationBlocks": sdict})
                 self._block_ids.update({block.id.decode(): sdict})
@@ -528,9 +534,9 @@ class BlockList:
                 block_mid._blocklist = self
                 blocktype = block_mid.blocktype
                 name = get_member_name(block_mid.name) + "_mid"
-                if blocktype == SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH:
+                if blocktype == SdfBlockType.LAGRANGIAN_MESH:
                     newblock = BlockLagrangianMesh(block_mid, mid=True)
-                elif blocktype == SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH:
+                elif blocktype == SdfBlockType.PLAIN_MESH:
                     newblock = BlockPlainMesh(block_mid, mid=True)
                 if not newblock_mid.dont_display:
                     self.__dict__[name] = newblock
@@ -608,12 +614,12 @@ class BlockList:
         self._block_names.update({name: newblock})
 
     def _add_constant(self, name, value=0, datatype=None, id=None):
-        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+        if datatype == SdfDataType.CHARACTER:
             print(f'Block "{id}", unsupported datatype: {type(value)}')
             return
 
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_CONSTANT
+        block.blocktype = SdfBlockType.CONSTANT
         block.AddBlock = BlockConstant
 
         const_value = struct.pack(_st_datatypes[block.datatype], value)
@@ -623,13 +629,13 @@ class BlockList:
 
     def _add_namevalue(self, name, value={}, datatype=None, id=None):
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_NAMEVALUE
+        block.blocktype = SdfBlockType.NAMEVALUE
         block.AddBlock = BlockNameValue
 
         nvalue = len(value)
         block.ndims = nvalue
         ctype = _ct_datatypes[block.datatype]
-        if block.datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+        if block.datatype == SdfDataType.CHARACTER:
             vals = self._string_array_ctype(value.values())
         else:
             vals = (ctype * nvalue)(*value.values())
@@ -640,12 +646,12 @@ class BlockList:
         self._add_post(block)
 
     def _add_array(self, name, value=(), datatype=None, id=None):
-        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+        if datatype == SdfDataType.CHARACTER:
             print(f'Block "{id}", unsupported datatype: {type(value[0])}')
             return
 
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_ARRAY
+        block.blocktype = SdfBlockType.ARRAY
         block.AddBlock = BlockArray
 
         block._data = np.array(value)
@@ -667,7 +673,7 @@ class BlockList:
         mesh_id=None,
         stagger=None,
     ):
-        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+        if datatype == SdfDataType.CHARACTER:
             print(f'Block "{id}", unsupported datatype: {type(value[0])}')
             return
         try:
@@ -690,7 +696,7 @@ class BlockList:
             return
 
         h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_VARIABLE
+        block.blocktype = SdfBlockType.PLAIN_VARIABLE
         block.AddBlock = BlockPlainVariable
 
         block._data = np.array(value, order="F")
@@ -721,7 +727,7 @@ class BlockList:
         geometry=None,
         **kwargs,
     ):
-        if datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+        if datatype == SdfDataType.CHARACTER:
             print(f'Block "{id}", unsupported datatype: {type(value[0])}')
             return
 
@@ -739,12 +745,12 @@ class BlockList:
         grids = [row.ctypes.data_as(ct.c_void_p) for row in block._data]
         block.grids = (ct.c_void_p * block.ngrids)(*grids)
         if block._data[0].ndim == 1:
-            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_PLAIN_MESH
+            block.blocktype = SdfBlockType.PLAIN_MESH
             block.AddBlock = BlockPlainMesh
             for i in range(block.ndims):
                 block.dims[i] = block._data[i].shape[0]
         else:
-            block.blocktype = SdfBlockType.SDF_BLOCKTYPE_LAGRANGIAN_MESH
+            block.blocktype = SdfBlockType.LAGRANGIAN_MESH
             block.AddBlock = BlockLagrangianMesh
             for i in range(block.ndims):
                 block.dims[i] = block._data[0].shape[i]
@@ -754,7 +760,7 @@ class BlockList:
             block.dim_labels = self._create_id_array(labels)
         if isinstance(geometry, str):
             if geometry == "rz":
-                geometry = SdfGeometry.SDF_GEOMETRY_CYLINDRICAL
+                geometry = SdfGeometry.CYLINDRICAL
         if isinstance(geometry, int):
             block.geometry = geometry
 
@@ -794,17 +800,17 @@ class BlockList:
 
         datatype = None
         if isinstance(val, bool):
-            datatype = SdfDataType.SDF_DATATYPE_LOGICAL
+            datatype = SdfDataType.LOGICAL
         elif isinstance(val, np.int32):
-            datatype = SdfDataType.SDF_DATATYPE_INTEGER4
+            datatype = SdfDataType.INTEGER4
         elif isinstance(val, (int, np.int64)):
-            datatype = SdfDataType.SDF_DATATYPE_INTEGER8
+            datatype = SdfDataType.INTEGER8
         elif isinstance(val, np.float32):
-            datatype = SdfDataType.SDF_DATATYPE_REAL4
+            datatype = SdfDataType.REAL4
         elif isinstance(val, float):
-            datatype = SdfDataType.SDF_DATATYPE_REAL8
+            datatype = SdfDataType.REAL8
         elif isinstance(val, str):
-            datatype = SdfDataType.SDF_DATATYPE_CHARACTER
+            datatype = SdfDataType.CHARACTER
         else:
             add_func = None
 
@@ -1071,7 +1077,7 @@ class BlockNameValue(Block):
         vals = {}
         for n in range(block.ndims):
             val = None
-            if block.datatype == SdfDataType.SDF_DATATYPE_CHARACTER:
+            if block.datatype == SdfDataType.CHARACTER:
                 p = ct.cast(block.data, ct.POINTER(ct.c_char_p))
                 val = p[n].decode()
             else:
@@ -1310,7 +1316,9 @@ def new(dict=False, code_name="sdfr", restart=False):
         Return file contents as a dictionary rather than member names.
     """
 
-    blocklist = BlockList(mode=SDF_WRITE, code_name=code_name, restart=restart)
+    blocklist = BlockList(
+        mode=SdfMode.WRITE, code_name=code_name, restart=restart
+    )
 
     if isinstance(dict, str):
         if dict == "id" or dict == "ids":
