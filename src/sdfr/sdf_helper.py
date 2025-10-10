@@ -725,6 +725,8 @@ def plot_auto(*args, **kwargs):
         elif len(args[0].grid.dims) == 1:
             plot1d(*args, **kwargs)
         else:
+            if isinstance(args[0], SDF.BlockPointVariable):
+                kwargs["add_lines"] = False
             plot_path(*args, **kwargs)
     elif isinstance(args[0], sdf.BlockLagrangianMesh) and dims[1] == 1:
         plot_path(*args, **kwargs)
@@ -913,6 +915,7 @@ def plot_path(
     axis_only=False,
     clip_reflect=False,
     power=(-3, 3),
+    add_lines=True,
     **kwargs,
 ):
     """Plot an SDF path variable (eg. a laser ray)
@@ -1145,17 +1148,30 @@ def plot_path(
 
             plot_path.norm_values = plt.Normalize(vmin, vmax)
 
-    kk = {}
-    k = "lw"
-    if k in kwargs:
-        kk[k] = kwargs[k]
-    k = "linewidth"
-    if k in kwargs:
-        kk[k] = kwargs[k]
-    lc = LineCollection(segments, norm=plot_path.norm_values, **kk)
-    if isvar:
-        lc.set_array(c)
-    im = subplot.add_collection(lc)
+    im = None
+    if add_lines:
+        kk = {}
+        k = "lw"
+        if k in kwargs:
+            kk[k] = kwargs[k]
+        k = "linewidth"
+        if k in kwargs:
+            kk[k] = kwargs[k]
+        lc = LineCollection(segments, norm=plot_path.norm_values, **kk)
+        if isvar:
+            lc.set_array(c)
+        im = subplot.add_collection(lc)
+
+    s = None
+    for k in "markersize", "ms":
+        if k in kwargs:
+            s = kwargs[k]
+    if not add_lines or s is not None:
+        if s is None:
+            s = 1
+        im1 = subplot.scatter(X, Y, c=c, s=s, vmin=vmin, vmax=vmax)
+        if im is None:
+            im = im1
 
     if not hold:
         subplot.set_xlabel(
