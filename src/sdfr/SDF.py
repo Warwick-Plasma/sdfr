@@ -587,6 +587,9 @@ class BlockList:
     def write(self, filename):
         if not self._handle:
             return
+        for k, b in self._block_ids.items():
+            if isinstance(b, Block) and b._contents.in_file:
+                _ = b.data
         self._clib.sdf_write(self._handle, filename.encode())
 
     @property
