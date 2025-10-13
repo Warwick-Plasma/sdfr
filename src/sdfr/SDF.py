@@ -15,11 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ctypes as ct
-import numpy as np
-import struct
-from enum import IntEnum
-from .loadlib import sdf_lib
+import ctypes as _c
+import numpy as _np
+import struct as _struct
+from enum import IntEnum as _IntEnum
+from ._loadlib import sdf_lib as _sdf_lib
 
 # try:
 #    import xarray as xr
@@ -30,8 +30,8 @@ from .loadlib import sdf_lib
 #    got_xarray = False
 
 
-# Enum representation using ct
-class SdfBlockType(IntEnum):
+# Enum representation using _c
+class SdfBlockType(_IntEnum):
     SCRUBBED = -1
     NULL = 0
     PLAIN_MESH = 1
@@ -65,14 +65,14 @@ class SdfBlockType(IntEnum):
     NAMEVALUE = 29
 
 
-class SdfGeometry(IntEnum):
+class SdfGeometry(_IntEnum):
     NULL = 0
     CARTESIAN = 1
     CYLINDRICAL = 2
     SPHERICAL = 3
 
 
-class SdfStagger(IntEnum):
+class SdfStagger(_IntEnum):
     CELL_CENTRE = 0
     FACE_X = 1
     FACE_Y = 2
@@ -86,7 +86,7 @@ class SdfStagger(IntEnum):
     HIDDEN2 = 12
 
 
-class SdfDataType(IntEnum):
+class SdfDataType(_IntEnum):
     NULL = 0
     INTEGER4 = 1
     INTEGER8 = 2
@@ -98,32 +98,32 @@ class SdfDataType(IntEnum):
     OTHER = 8
 
 
-class SdfMode(IntEnum):
+class SdfMode(_IntEnum):
     READ = 1
     WRITE = 2
 
 
 _np_datatypes = [
     0,
-    np.int32,
-    np.int64,
-    np.float32,
-    np.float64,
-    np.longdouble,
-    np.byte,
-    np.int32,
+    _np.int32,
+    _np.int64,
+    _np.float32,
+    _np.float64,
+    _np.longdouble,
+    _np.byte,
+    _np.int32,
     bool,
     0,
 ]
 _ct_datatypes = [
     0,
-    ct.c_int32,
-    ct.c_int64,
-    ct.c_float,
-    ct.c_double,
-    ct.c_longdouble,
-    ct.c_char,
-    ct.c_bool,
+    _c.c_int32,
+    _c.c_int64,
+    _c.c_float,
+    _c.c_double,
+    _c.c_longdouble,
+    _c.c_char,
+    _c.c_bool,
     0,
 ]
 _st_datatypes = [
@@ -139,218 +139,218 @@ _st_datatypes = [
 ]
 
 # Constants
-SDF_MAXDIMS = 4
+_SDF_MAXDIMS = 4
 
 
-class SdfBlock(ct.Structure):
+class SdfBlock(_c.Structure):
     pass  # Forward declaration for self-referencing structure
 
 
-class SdfFile(ct.Structure):
+class SdfFile(_c.Structure):
     pass  # Forward declaration for function pointer compatibility
 
 
 SdfBlock._fields_ = [
-    ("extents", ct.POINTER(ct.c_double)),
-    ("dim_mults", ct.POINTER(ct.c_double)),
-    ("station_x", ct.POINTER(ct.c_double)),
-    ("station_y", ct.POINTER(ct.c_double)),
-    ("station_z", ct.POINTER(ct.c_double)),
-    ("mult", ct.c_double),
-    ("time", ct.c_double),
-    ("time_increment", ct.c_double),
-    ("dims", ct.c_int64 * SDF_MAXDIMS),
-    ("local_dims", ct.c_int64 * SDF_MAXDIMS),
-    ("block_start", ct.c_int64),
-    ("next_block_location", ct.c_int64),
-    ("data_location", ct.c_int64),
-    ("inline_block_start", ct.c_int64),
-    ("inline_next_block_location", ct.c_int64),
-    ("summary_block_start", ct.c_int64),
-    ("summary_next_block_location", ct.c_int64),
-    ("nelements", ct.c_int64),
-    ("nelements_local", ct.c_int64),
-    ("data_length", ct.c_int64),
-    ("nelements_blocks", ct.POINTER(ct.c_int64)),
-    ("data_length_blocks", ct.POINTER(ct.c_int64)),
-    ("array_starts", ct.POINTER(ct.c_int64)),
-    ("array_ends", ct.POINTER(ct.c_int64)),
-    ("array_strides", ct.POINTER(ct.c_int64)),
-    ("global_array_starts", ct.POINTER(ct.c_int64)),
-    ("global_array_ends", ct.POINTER(ct.c_int64)),
-    ("global_array_strides", ct.POINTER(ct.c_int64)),
-    ("ndims", ct.c_int32),
-    ("geometry", ct.c_int32),
-    ("datatype", ct.c_int32),
-    ("blocktype", ct.c_int32),
-    ("info_length", ct.c_int32),
-    ("type_size", ct.c_int32),
-    ("stagger", ct.c_int32),
-    ("datatype_out", ct.c_int32),
-    ("type_size_out", ct.c_int32),
-    ("nstations", ct.c_int32),
-    ("nvariables", ct.c_int32),
-    ("step", ct.c_int32),
-    ("step_increment", ct.c_int32),
-    ("dims_in", ct.POINTER(ct.c_int32)),
-    ("station_nvars", ct.POINTER(ct.c_int32)),
-    ("variable_types", ct.POINTER(ct.c_int32)),
-    ("station_index", ct.POINTER(ct.c_int32)),
-    ("station_move", ct.POINTER(ct.c_int32)),
-    ("nm", ct.c_int),
-    ("n_ids", ct.c_int),
-    ("opt", ct.c_int),
-    ("ng", ct.c_int),
-    ("nfaces", ct.c_int),
-    ("ngrids", ct.c_int),
-    ("offset", ct.c_int),
-    ("ngb", ct.c_int * 6),
-    ("const_value", ct.c_byte * 16),
-    ("id", ct.c_char_p),
-    ("units", ct.c_char_p),
-    ("mesh_id", ct.c_char_p),
-    ("material_id", ct.c_char_p),
-    ("vfm_id", ct.c_char_p),
-    ("obstacle_id", ct.c_char_p),
-    ("station_id", ct.c_char_p),
-    ("name", ct.c_char_p),
-    ("material_name", ct.c_char_p),
-    ("must_read", ct.c_char_p),
-    ("dim_labels", ct.POINTER(ct.c_char_p)),
-    ("dim_units", ct.POINTER(ct.c_char_p)),
-    ("station_ids", ct.POINTER(ct.c_char_p)),
-    ("variable_ids", ct.POINTER(ct.c_char_p)),
-    ("station_names", ct.POINTER(ct.c_char_p)),
-    ("material_names", ct.POINTER(ct.c_char_p)),
-    ("node_list", ct.POINTER(ct.c_int)),
-    ("boundary_cells", ct.POINTER(ct.c_int)),
-    ("grids", ct.POINTER(ct.c_void_p)),
-    ("data", ct.c_void_p),
-    ("done_header", ct.c_bool),
-    ("done_info", ct.c_bool),
-    ("done_data", ct.c_bool),
-    ("dont_allocate", ct.c_bool),
-    ("dont_display", ct.c_bool),
-    ("dont_own_data", ct.c_bool),
-    ("use_mult", ct.c_bool),
-    ("next_block_modified", ct.c_bool),
-    ("rewrite_metadata", ct.c_bool),
-    ("in_file", ct.c_bool),
-    ("ng_any", ct.c_bool),
-    ("no_internal_ghost", ct.c_bool),
-    ("next", ct.POINTER(SdfBlock)),
-    ("prev", ct.POINTER(SdfBlock)),
-    ("subblock", ct.POINTER(SdfBlock)),
-    ("subblock2", ct.POINTER(SdfBlock)),
+    ("extents", _c.POINTER(_c.c_double)),
+    ("dim_mults", _c.POINTER(_c.c_double)),
+    ("station_x", _c.POINTER(_c.c_double)),
+    ("station_y", _c.POINTER(_c.c_double)),
+    ("station_z", _c.POINTER(_c.c_double)),
+    ("mult", _c.c_double),
+    ("time", _c.c_double),
+    ("time_increment", _c.c_double),
+    ("dims", _c.c_int64 * _SDF_MAXDIMS),
+    ("local_dims", _c.c_int64 * _SDF_MAXDIMS),
+    ("block_start", _c.c_int64),
+    ("next_block_location", _c.c_int64),
+    ("data_location", _c.c_int64),
+    ("inline_block_start", _c.c_int64),
+    ("inline_next_block_location", _c.c_int64),
+    ("summary_block_start", _c.c_int64),
+    ("summary_next_block_location", _c.c_int64),
+    ("nelements", _c.c_int64),
+    ("nelements_local", _c.c_int64),
+    ("data_length", _c.c_int64),
+    ("nelements_blocks", _c.POINTER(_c.c_int64)),
+    ("data_length_blocks", _c.POINTER(_c.c_int64)),
+    ("array_starts", _c.POINTER(_c.c_int64)),
+    ("array_ends", _c.POINTER(_c.c_int64)),
+    ("array_strides", _c.POINTER(_c.c_int64)),
+    ("global_array_starts", _c.POINTER(_c.c_int64)),
+    ("global_array_ends", _c.POINTER(_c.c_int64)),
+    ("global_array_strides", _c.POINTER(_c.c_int64)),
+    ("ndims", _c.c_int32),
+    ("geometry", _c.c_int32),
+    ("datatype", _c.c_int32),
+    ("blocktype", _c.c_int32),
+    ("info_length", _c.c_int32),
+    ("type_size", _c.c_int32),
+    ("stagger", _c.c_int32),
+    ("datatype_out", _c.c_int32),
+    ("type_size_out", _c.c_int32),
+    ("nstations", _c.c_int32),
+    ("nvariables", _c.c_int32),
+    ("step", _c.c_int32),
+    ("step_increment", _c.c_int32),
+    ("dims_in", _c.POINTER(_c.c_int32)),
+    ("station_nvars", _c.POINTER(_c.c_int32)),
+    ("variable_types", _c.POINTER(_c.c_int32)),
+    ("station_index", _c.POINTER(_c.c_int32)),
+    ("station_move", _c.POINTER(_c.c_int32)),
+    ("nm", _c.c_int),
+    ("n_ids", _c.c_int),
+    ("opt", _c.c_int),
+    ("ng", _c.c_int),
+    ("nfaces", _c.c_int),
+    ("ngrids", _c.c_int),
+    ("offset", _c.c_int),
+    ("ngb", _c.c_int * 6),
+    ("const_value", _c.c_byte * 16),
+    ("id", _c.c_char_p),
+    ("units", _c.c_char_p),
+    ("mesh_id", _c.c_char_p),
+    ("material_id", _c.c_char_p),
+    ("vfm_id", _c.c_char_p),
+    ("obstacle_id", _c.c_char_p),
+    ("station_id", _c.c_char_p),
+    ("name", _c.c_char_p),
+    ("material_name", _c.c_char_p),
+    ("must_read", _c.c_char_p),
+    ("dim_labels", _c.POINTER(_c.c_char_p)),
+    ("dim_units", _c.POINTER(_c.c_char_p)),
+    ("station_ids", _c.POINTER(_c.c_char_p)),
+    ("variable_ids", _c.POINTER(_c.c_char_p)),
+    ("station_names", _c.POINTER(_c.c_char_p)),
+    ("material_names", _c.POINTER(_c.c_char_p)),
+    ("node_list", _c.POINTER(_c.c_int)),
+    ("boundary_cells", _c.POINTER(_c.c_int)),
+    ("grids", _c.POINTER(_c.c_void_p)),
+    ("data", _c.c_void_p),
+    ("done_header", _c.c_bool),
+    ("done_info", _c.c_bool),
+    ("done_data", _c.c_bool),
+    ("dont_allocate", _c.c_bool),
+    ("dont_display", _c.c_bool),
+    ("dont_own_data", _c.c_bool),
+    ("use_mult", _c.c_bool),
+    ("next_block_modified", _c.c_bool),
+    ("rewrite_metadata", _c.c_bool),
+    ("in_file", _c.c_bool),
+    ("ng_any", _c.c_bool),
+    ("no_internal_ghost", _c.c_bool),
+    ("next", _c.POINTER(SdfBlock)),
+    ("prev", _c.POINTER(SdfBlock)),
+    ("subblock", _c.POINTER(SdfBlock)),
+    ("subblock2", _c.POINTER(SdfBlock)),
     (
         "populate_data",
-        ct.CFUNCTYPE(
-            ct.POINTER(SdfBlock), ct.POINTER(SdfFile), ct.POINTER(SdfBlock)
+        _c.CFUNCTYPE(
+            _c.POINTER(SdfBlock), _c.POINTER(SdfFile), _c.POINTER(SdfBlock)
         ),
     ),
-    ("cpu_split", ct.c_int * SDF_MAXDIMS),
-    ("starts", ct.c_int * SDF_MAXDIMS),
-    ("proc_min", ct.c_int * 3),
-    ("proc_max", ct.c_int * 3),
-    ("ndim_labels", ct.c_int),
-    ("ndim_units", ct.c_int),
-    ("nstation_ids", ct.c_int),
-    ("nvariable_ids", ct.c_int),
-    ("nstation_names", ct.c_int),
-    ("nmaterial_names", ct.c_int),
-    ("option", ct.c_int),
-    ("mimetype", ct.c_char_p),
-    ("checksum_type", ct.c_char_p),
-    ("checksum", ct.c_char_p),
-    ("mmap", ct.c_char_p),
-    ("mmap_len", ct.c_int64),
-    ("derived", ct.c_bool),
+    ("cpu_split", _c.c_int * _SDF_MAXDIMS),
+    ("starts", _c.c_int * _SDF_MAXDIMS),
+    ("proc_min", _c.c_int * 3),
+    ("proc_max", _c.c_int * 3),
+    ("ndim_labels", _c.c_int),
+    ("ndim_units", _c.c_int),
+    ("nstation_ids", _c.c_int),
+    ("nvariable_ids", _c.c_int),
+    ("nstation_names", _c.c_int),
+    ("nmaterial_names", _c.c_int),
+    ("option", _c.c_int),
+    ("mimetype", _c.c_char_p),
+    ("checksum_type", _c.c_char_p),
+    ("checksum", _c.c_char_p),
+    ("mmap", _c.c_char_p),
+    ("mmap_len", _c.c_int64),
+    ("derived", _c.c_bool),
 ]
 
 SdfFile._fields_ = [
-    ("dbg_count", ct.c_int64),
-    ("sdf_lib_version", ct.c_int32),
-    ("sdf_lib_revision", ct.c_int32),
-    ("sdf_extension_version", ct.c_int32),
-    ("sdf_extension_revision", ct.c_int32),
-    ("file_version", ct.c_int32),
-    ("file_revision", ct.c_int32),
-    ("dbg", ct.c_char_p),
-    ("dbg_buf", ct.c_char_p),
-    ("extension_names", ct.POINTER(ct.c_char_p)),
-    ("time", ct.c_double),
-    ("first_block_location", ct.c_int64),
-    ("summary_location", ct.c_int64),
-    ("start_location", ct.c_int64),
-    ("soi", ct.c_int64),
-    ("sof", ct.c_int64),
-    ("current_location", ct.c_int64),
-    ("jobid1", ct.c_int32),
-    ("jobid2", ct.c_int32),
-    ("endianness", ct.c_int32),
-    ("summary_size", ct.c_int32),
-    ("block_header_length", ct.c_int32),
-    ("string_length", ct.c_int32),
-    ("id_length", ct.c_int32),
-    ("code_io_version", ct.c_int32),
-    ("step", ct.c_int32),
-    ("nblocks", ct.c_int32),
-    ("nblocks_file", ct.c_int32),
-    ("error_code", ct.c_int32),
-    ("rank", ct.c_int),
-    ("ncpus", ct.c_int),
-    ("ndomains", ct.c_int),
-    ("rank_master", ct.c_int),
-    ("indent", ct.c_int),
-    ("print", ct.c_int),
-    ("buffer", ct.c_char_p),
-    ("filename", ct.c_char_p),
-    ("done_header", ct.c_bool),
-    ("restart_flag", ct.c_bool),
-    ("other_domains", ct.c_bool),
-    ("use_float", ct.c_bool),
-    ("use_summary", ct.c_bool),
-    ("use_random", ct.c_bool),
-    ("station_file", ct.c_bool),
-    ("swap", ct.c_bool),
-    ("inline_metadata_read", ct.c_bool),
-    ("summary_metadata_read", ct.c_bool),
-    ("inline_metadata_invalid", ct.c_bool),
-    ("summary_metadata_invalid", ct.c_bool),
-    ("tmp_flag", ct.c_bool),
-    ("metadata_modified", ct.c_bool),
-    ("can_truncate", ct.c_bool),
-    ("first_block_modified", ct.c_bool),
-    ("code_name", ct.c_char_p),
-    ("error_message", ct.c_char_p),
-    ("blocklist", ct.POINTER(SdfBlock)),
-    ("tail", ct.POINTER(SdfBlock)),
-    ("current_block", ct.POINTER(SdfBlock)),
-    ("last_block_in_file", ct.POINTER(SdfBlock)),
-    ("mmap", ct.c_char_p),
-    ("ext_data", ct.c_void_p),
-    ("stack_handle", ct.c_void_p),
-    ("array_count", ct.c_int),
-    ("fd", ct.c_int),
-    ("purge_duplicated_ids", ct.c_int),
-    ("internal_ghost_cells", ct.c_int),
-    ("ignore_nblocks", ct.c_int),
+    ("dbg_count", _c.c_int64),
+    ("sdf_lib_version", _c.c_int32),
+    ("sdf_lib_revision", _c.c_int32),
+    ("sdf_extension_version", _c.c_int32),
+    ("sdf_extension_revision", _c.c_int32),
+    ("file_version", _c.c_int32),
+    ("file_revision", _c.c_int32),
+    ("dbg", _c.c_char_p),
+    ("dbg_buf", _c.c_char_p),
+    ("extension_names", _c.POINTER(_c.c_char_p)),
+    ("time", _c.c_double),
+    ("first_block_location", _c.c_int64),
+    ("summary_location", _c.c_int64),
+    ("start_location", _c.c_int64),
+    ("soi", _c.c_int64),
+    ("sof", _c.c_int64),
+    ("current_location", _c.c_int64),
+    ("jobid1", _c.c_int32),
+    ("jobid2", _c.c_int32),
+    ("endianness", _c.c_int32),
+    ("summary_size", _c.c_int32),
+    ("block_header_length", _c.c_int32),
+    ("string_length", _c.c_int32),
+    ("id_length", _c.c_int32),
+    ("code_io_version", _c.c_int32),
+    ("step", _c.c_int32),
+    ("nblocks", _c.c_int32),
+    ("nblocks_file", _c.c_int32),
+    ("error_code", _c.c_int32),
+    ("rank", _c.c_int),
+    ("ncpus", _c.c_int),
+    ("ndomains", _c.c_int),
+    ("rank_master", _c.c_int),
+    ("indent", _c.c_int),
+    ("print", _c.c_int),
+    ("buffer", _c.c_char_p),
+    ("filename", _c.c_char_p),
+    ("done_header", _c.c_bool),
+    ("restart_flag", _c.c_bool),
+    ("other_domains", _c.c_bool),
+    ("use_float", _c.c_bool),
+    ("use_summary", _c.c_bool),
+    ("use_random", _c.c_bool),
+    ("station_file", _c.c_bool),
+    ("swap", _c.c_bool),
+    ("inline_metadata_read", _c.c_bool),
+    ("summary_metadata_read", _c.c_bool),
+    ("inline_metadata_invalid", _c.c_bool),
+    ("summary_metadata_invalid", _c.c_bool),
+    ("tmp_flag", _c.c_bool),
+    ("metadata_modified", _c.c_bool),
+    ("can_truncate", _c.c_bool),
+    ("first_block_modified", _c.c_bool),
+    ("code_name", _c.c_char_p),
+    ("error_message", _c.c_char_p),
+    ("blocklist", _c.POINTER(SdfBlock)),
+    ("tail", _c.POINTER(SdfBlock)),
+    ("current_block", _c.POINTER(SdfBlock)),
+    ("last_block_in_file", _c.POINTER(SdfBlock)),
+    ("mmap", _c.c_char_p),
+    ("ext_data", _c.c_void_p),
+    ("stack_handle", _c.c_void_p),
+    ("array_count", _c.c_int),
+    ("fd", _c.c_int),
+    ("purge_duplicated_ids", _c.c_int),
+    ("internal_ghost_cells", _c.c_int),
+    ("ignore_nblocks", _c.c_int),
 ]
 
 
-class RunInfo(ct.Structure):
+class RunInfo(_c.Structure):
     _fields_ = [
-        ("defines", ct.c_int64),
-        ("version", ct.c_int32),
-        ("revision", ct.c_int32),
-        ("compile_date", ct.c_int32),
-        ("run_date", ct.c_int32),
-        ("io_date", ct.c_int32),
-        ("minor_rev", ct.c_int32),
-        ("commit_id", ct.c_char_p),
-        ("sha1sum", ct.c_char_p),
-        ("compile_machine", ct.c_char_p),
-        ("compile_flags", ct.c_char_p),
+        ("defines", _c.c_int64),
+        ("version", _c.c_int32),
+        ("revision", _c.c_int32),
+        ("compile_date", _c.c_int32),
+        ("run_date", _c.c_int32),
+        ("io_date", _c.c_int32),
+        ("minor_rev", _c.c_int32),
+        ("commit_id", _c.c_char_p),
+        ("sha1sum", _c.c_char_p),
+        ("compile_machine", _c.c_char_p),
+        ("compile_flags", _c.c_char_p),
     ]
 
 
@@ -367,47 +367,47 @@ class BlockList:
         restart=False,
     ):
         self._handle = None
-        clib = sdf_lib
+        clib = _sdf_lib
         self._clib = clib
-        clib.sdf_open.restype = ct.POINTER(SdfFile)
-        clib.sdf_open.argtypes = [ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
-        clib.sdf_new.restype = ct.POINTER(SdfFile)
-        clib.sdf_new.argtypes = [ct.c_int, ct.c_int]
-        clib.sdf_stack_init.argtypes = [ct.c_void_p]
-        clib.sdf_read_blocklist.argtypes = [ct.c_void_p]
-        clib.sdf_read_blocklist_all.argtypes = [ct.c_void_p]
-        clib.sdf_helper_read_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
-        clib.sdf_free_block_data.argtypes = [ct.c_void_p, ct.POINTER(SdfBlock)]
-        clib.sdf_stack_destroy.argtypes = [ct.c_void_p]
-        clib.sdf_close.argtypes = [ct.c_void_p]
-        clib.sdf_write.argtypes = [ct.c_void_p, ct.c_char_p]
-        clib.sdf_get_next_block.argtypes = [ct.c_void_p]
+        clib.sdf_open.restype = _c.POINTER(SdfFile)
+        clib.sdf_open.argtypes = [_c.c_char_p, _c.c_int, _c.c_int, _c.c_int]
+        clib.sdf_new.restype = _c.POINTER(SdfFile)
+        clib.sdf_new.argtypes = [_c.c_int, _c.c_int]
+        clib.sdf_stack_init.argtypes = [_c.c_void_p]
+        clib.sdf_read_blocklist.argtypes = [_c.c_void_p]
+        clib.sdf_read_blocklist_all.argtypes = [_c.c_void_p]
+        clib.sdf_helper_read_data.argtypes = [_c.c_void_p, _c.POINTER(SdfBlock)]
+        clib.sdf_free_block_data.argtypes = [_c.c_void_p, _c.POINTER(SdfBlock)]
+        clib.sdf_stack_destroy.argtypes = [_c.c_void_p]
+        clib.sdf_close.argtypes = [_c.c_void_p]
+        clib.sdf_write.argtypes = [_c.c_void_p, _c.c_char_p]
+        clib.sdf_get_next_block.argtypes = [_c.c_void_p]
         clib.sdf_set_namevalue.argtypes = [
-            ct.POINTER(SdfBlock),
-            ct.POINTER(ct.c_char_p),
-            ct.POINTER(ct.c_void_p),
+            _c.POINTER(SdfBlock),
+            _c.POINTER(_c.c_char_p),
+            _c.POINTER(_c.c_void_p),
         ]
-        clib.sdf_set_code_name.argtypes = [ct.c_void_p, ct.c_char_p]
+        clib.sdf_set_code_name.argtypes = [_c.c_void_p, _c.c_char_p]
         clib.sdf_set_block_name.argtypes = [
-            ct.c_void_p,
-            ct.c_char_p,
-            ct.c_char_p,
+            _c.c_void_p,
+            _c.c_char_p,
+            _c.c_char_p,
         ]
         clib.sdf_set_defaults.argtypes = [
-            ct.c_void_p,
-            ct.POINTER(SdfBlock),
+            _c.c_void_p,
+            _c.POINTER(SdfBlock),
         ]
         clib.sdf_create_id.argtypes = [
-            ct.c_void_p,
-            ct.c_char_p,
+            _c.c_void_p,
+            _c.c_char_p,
         ]
-        clib.sdf_create_id.restype = ct.POINTER(ct.c_char_p)
+        clib.sdf_create_id.restype = _c.POINTER(_c.c_char_p)
         clib.sdf_create_id_array.argtypes = [
-            ct.c_void_p,
-            ct.c_int,
-            ct.POINTER(ct.c_char_p),
+            _c.c_void_p,
+            _c.c_int,
+            _c.POINTER(_c.c_char_p),
         ]
-        clib.sdf_create_id_array.restype = ct.POINTER(ct.c_char_p)
+        clib.sdf_create_id_array.restype = _c.POINTER(_c.c_char_p)
 
         comm = 0
         use_mmap = 0
@@ -434,7 +434,7 @@ class BlockList:
 
         block = h.contents.blocklist
         h.contents.restart_flag = restart
-        self.Header = get_header(h.contents)
+        self.Header = _get_header(h.contents)
         mesh_id_map = {}
         mesh_vars = []
         self._block_ids = {"Header": self.Header}
@@ -446,7 +446,7 @@ class BlockList:
             blocktype = block.blocktype
             newblock = None
             newblock_mid = None
-            name = get_member_name(block.name)
+            name = _get_member_name(block.name)
             if blocktype == SdfBlockType.ARRAY:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.CONSTANT:
@@ -511,9 +511,9 @@ class BlockList:
                 newblock = BlockPointMesh(block)
                 mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.RUN_INFO:
-                self.Run_info = get_run_info(block)
+                self.Run_info = _get_run_info(block)
             elif blocktype == SdfBlockType.STATION:
-                sdict = BlockStation(block, name)
+                sdict = _BlockStation(block, name)
                 self.__dict__.update({"StationBlocks": sdict})
                 self._block_ids.update({block.id.decode(): sdict})
                 self._block_names.update({block.name.decode(): sdict})
@@ -533,7 +533,7 @@ class BlockList:
                 block_mid._handle = h
                 block_mid._blocklist = self
                 blocktype = block_mid.blocktype
-                name = get_member_name(block_mid.name) + "_mid"
+                name = _get_member_name(block_mid.name) + "_mid"
                 if blocktype == SdfBlockType.LAGRANGIAN_MESH:
                     newblock = BlockLagrangianMesh(block_mid, mid=True)
                 elif blocktype == SdfBlockType.PLAIN_MESH:
@@ -569,13 +569,13 @@ class BlockList:
 
     def _create_id(self, values):
         tmp = self._clib.sdf_create_id(self._handle, values.encode("utf-8"))
-        return ct.cast(tmp, ct.c_char_p)
+        return _c.cast(tmp, _c.c_char_p)
 
     def _string_array_ctype(self, values):
         strings = [s.encode("utf-8") for s in values]
-        strings = [ct.create_string_buffer(s) for s in strings]
-        strings = [ct.cast(s, ct.c_char_p) for s in strings]
-        strings = (ct.c_char_p * len(values))(*strings)
+        strings = [_c.create_string_buffer(s) for s in strings]
+        strings = [_c.cast(s, _c.c_char_p) for s in strings]
+        strings = (_c.c_char_p * len(values))(*strings)
         return strings
 
     def _create_id_array(self, values):
@@ -622,8 +622,8 @@ class BlockList:
         block.blocktype = SdfBlockType.CONSTANT
         block.AddBlock = BlockConstant
 
-        const_value = struct.pack(_st_datatypes[block.datatype], value)
-        ct.memmove(block.const_value, const_value, 16)
+        const_value = _struct.pack(_st_datatypes[block.datatype], value)
+        _c.memmove(block.const_value, const_value, 16)
 
         self._add_post(block)
 
@@ -640,7 +640,7 @@ class BlockList:
         else:
             vals = (ctype * nvalue)(*value.values())
         names = self._string_array_ctype(value.keys())
-        vals = ct.cast(vals, ct.POINTER(ct.c_void_p))
+        vals = _c.cast(vals, _c.POINTER(_c.c_void_p))
         self._clib.sdf_set_namevalue(block, names, vals)
 
         self._add_post(block)
@@ -654,11 +654,11 @@ class BlockList:
         block.blocktype = SdfBlockType.ARRAY
         block.AddBlock = BlockArray
 
-        block._data = np.array(value)
+        block._data = _np.array(value)
         block.ndims = block._data.ndim
         for i in range(block.ndims):
             block.dims[i] = block._data.shape[i]
-        block.data = block._data.ctypes.data_as(ct.c_void_p)
+        block.data = block._data.ctypes.data_as(_c.c_void_p)
 
         self._add_post(block)
 
@@ -699,11 +699,11 @@ class BlockList:
         block.blocktype = SdfBlockType.PLAIN_VARIABLE
         block.AddBlock = BlockPlainVariable
 
-        block._data = np.array(value, order="F")
+        block._data = _np.array(value, order="F")
         block.ndims = block._data.ndim
         for i in range(block.ndims):
             block.dims[i] = block._data.shape[i]
-        block.data = block._data.ctypes.data_as(ct.c_void_p)
+        block.data = block._data.ctypes.data_as(_c.c_void_p)
         if mult is not None:
             block.mult = mult
         if isinstance(units, str):
@@ -735,15 +735,15 @@ class BlockList:
 
         keys = ["x", "y", "z"]
         keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
-        val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+        val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
 
-        block._data = [np.array(kwargs[k], dtype=val.dtype) for k in keys]
-        block._data = [np.array(row, order="F") for row in block._data]
+        block._data = [_np.array(kwargs[k], dtype=val.dtype) for k in keys]
+        block._data = [_np.array(row, order="F") for row in block._data]
         block._data = tuple(block._data)
         block.ndims = len(block._data)
         block.ngrids = block.ndims
-        grids = [row.ctypes.data_as(ct.c_void_p) for row in block._data]
-        block.grids = (ct.c_void_p * block.ngrids)(*grids)
+        grids = [row.ctypes.data_as(_c.c_void_p) for row in block._data]
+        block.grids = (_c.c_void_p * block.ngrids)(*grids)
         if block._data[0].ndim == 1:
             block.blocktype = SdfBlockType.PLAIN_MESH
             block.AddBlock = BlockPlainMesh
@@ -772,8 +772,8 @@ class BlockList:
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
             add_func = self._add_namevalue
-        elif isinstance(value, (tuple, list, np.ndarray)):
-            arr = np.array(value)
+        elif isinstance(value, (tuple, list, _np.ndarray)):
+            arr = _np.array(value)
             if arr.ndim == 1:
                 val = value[0]
                 add_func = self._add_array
@@ -787,7 +787,7 @@ class BlockList:
             keys = ["x", "y", "z"]
             keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
             if len(keys) > 0:
-                val = np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+                val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
                 add_func = self._add_mesh
                 if id is None:
                     id = "grid"
@@ -801,11 +801,11 @@ class BlockList:
         datatype = None
         if isinstance(val, bool):
             datatype = SdfDataType.LOGICAL
-        elif isinstance(val, np.int32):
+        elif isinstance(val, _np.int32):
             datatype = SdfDataType.INTEGER4
-        elif isinstance(val, (int, np.int64)):
+        elif isinstance(val, (int, _np.int64)):
             datatype = SdfDataType.INTEGER8
-        elif isinstance(val, np.float32):
+        elif isinstance(val, _np.float32):
             datatype = SdfDataType.REAL4
         elif isinstance(val, float):
             datatype = SdfDataType.REAL8
@@ -850,15 +850,15 @@ class Block:
         self._data = None
 
     def _numpy_from_buffer(self, data, blen):
-        buffer_from_memory = ct.pythonapi.PyMemoryView_FromMemory
-        buffer_from_memory.restype = ct.py_object
+        buffer_from_memory = _c.pythonapi.PyMemoryView_FromMemory
+        buffer_from_memory.restype = _c.py_object
         dtype = self._datatype
-        if dtype == np.byte:
-            dtype = np.dtype("|S1")
+        if dtype == _np.byte:
+            dtype = _np.dtype("|S1")
         totype = _ct_datatypes[self._contents.datatype_out]
-        cast = ct.cast(data, ct.POINTER(totype))
+        cast = _c.cast(data, _c.POINTER(totype))
         buf = buffer_from_memory(cast, blen)
-        return np.frombuffer(buf, dtype)
+        return _np.frombuffer(buf, dtype)
 
     @property
     def blocklist(self):
@@ -916,7 +916,7 @@ class BlockPlainVariable(Block):
         if self._data is None:
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
-            blen = np.dtype(self._datatype).itemsize
+            blen = _np.dtype(self._datatype).itemsize
             for d in self.dims:
                 blen *= d
             array = self._numpy_from_buffer(self._contents.data, blen)
@@ -987,7 +987,7 @@ class BlockPlainMesh(Block):
             clib.sdf_helper_read_data(self._handle, self._contents)
             grids = []
             for i, d in enumerate(self._bdims):
-                blen = np.dtype(self._datatype).itemsize * d
+                blen = _np.dtype(self._datatype).itemsize * d
                 array = self._numpy_from_buffer(self._contents.grids[i], blen)
                 if self._mid:
                     array = 0.5 * (array[1:] + array[:-1])
@@ -1030,7 +1030,7 @@ class BlockLagrangianMesh(BlockPlainMesh):
         if self._data is None:
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
-            blen = np.dtype(self._datatype).itemsize
+            blen = _np.dtype(self._datatype).itemsize
             for d in self._bdims:
                 blen *= d
             grids = []
@@ -1078,12 +1078,12 @@ class BlockNameValue(Block):
         for n in range(block.ndims):
             val = None
             if block.datatype == SdfDataType.CHARACTER:
-                p = ct.cast(block.data, ct.POINTER(ct.c_char_p))
+                p = _c.cast(block.data, _c.POINTER(_c.c_char_p))
                 val = p[n].decode()
             else:
                 dt = _ct_datatypes[block.datatype]
-                val = ct.cast(block.data, ct.POINTER(dt))[n]
-            nid = get_member_name(block.material_names[n])
+                val = _c.cast(block.data, _c.POINTER(dt))[n]
+            nid = _get_member_name(block.material_names[n])
             vals[nid] = val
             self.__dict__[nid] = val
         self._data = vals
@@ -1098,7 +1098,7 @@ class BlockArray(Block):
         if self._data is None:
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
-            blen = np.dtype(self._datatype).itemsize
+            blen = _np.dtype(self._datatype).itemsize
             for d in self.dims:
                 blen *= d
             array = self._numpy_from_buffer(self._contents.data, blen)
@@ -1122,7 +1122,7 @@ class BlockData(Block):
             clib = self._handle._clib
             clib.sdf_helper_read_data(self._handle, self._contents)
             blen = self._contents.data_length
-            _data = ct.cast(self._contents.data, ct.POINTER(ct.c_char * blen))
+            _data = _c.cast(self._contents.data, _c.POINTER(_c.c_char * blen))
             self._data = _data.contents[:]
         return self._data
 
@@ -1142,7 +1142,7 @@ class BlockData(Block):
         return self._mimetype
 
 
-def BlockStation(block, name):
+def _BlockStation(block, name):
     """Station block"""
     sdict = dict(
         stations=None,
@@ -1217,7 +1217,7 @@ class BlockStitchedTensor(BlockStitched):
     pass
 
 
-def get_header(h):
+def _get_header(h):
     d = {}
     if h.filename:
         d["filename"] = h.filename.decode()
@@ -1236,13 +1236,13 @@ def get_header(h):
     return d
 
 
-def get_run_info(block):
+def _get_run_info(block):
     import datetime
     from datetime import datetime as dtm
 
     utc = datetime.timezone.utc
 
-    h = ct.cast(block.data, ct.POINTER(RunInfo)).contents
+    h = _c.cast(block.data, _c.POINTER(RunInfo)).contents
     d = {}
     d["version"] = f"{h.version}.{h.revision}.{h.minor_rev}"
     d["commit_id"] = h.commit_id.decode()
@@ -1255,7 +1255,7 @@ def get_run_info(block):
     return d
 
 
-def get_member_name(name):
+def _get_member_name(name):
     sname = name.decode()
     return "".join(
         [
@@ -1273,7 +1273,7 @@ def get_member_name(name):
     )
 
 
-def read(file=None, convert=False, mmap=0, dict=False, derived=True):
+def _read(file=None, convert=False, mmap=0, dict=False, derived=True):
     """Reads the SDF data and returns a dictionary of NumPy arrays.
 
     Parameters
@@ -1307,7 +1307,7 @@ def read(file=None, convert=False, mmap=0, dict=False, derived=True):
     return blocklist
 
 
-def new(dict=False, code_name="sdfr", restart=False):
+def _new(dict=False, code_name="sdfr", restart=False):
     """Creates a new SDF blocklist and returns a dictionary of NumPy arrays.
 
     Parameters

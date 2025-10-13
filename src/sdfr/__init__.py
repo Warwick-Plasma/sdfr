@@ -15,16 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .SDF import (
-    new,
-    read,
-)
+from .SDF import _new as new
+from .SDF import _read as read
 from . import sdf_helper
 from ._commit_info import (
     __commit_date__,
     __commit_id__,
 )
-from .loadlib import (
+from ._loadlib import (
     __library_commit_date__,
     __library_commit_id__,
 )
