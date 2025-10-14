@@ -840,6 +840,7 @@ class Block:
         self._dims = tuple(block.dims[: block.ndims])
         self._contents = block
         self._blocklist = block._blocklist
+        self._in_file = block.in_file
         self._data = None
 
     def _numpy_from_buffer(self, data, blen):
@@ -966,6 +967,7 @@ class BlockPlainMesh(Block):
             self._id += "_mid"
             self._name += "_mid"
             self._dims = tuple([i - 1 for i in self._dims])
+            self._in_file = False
         if bool(block.dim_mults):
             self._mult = tuple(block.dim_mults[: block.ndims])
         if bool(block.extents):
