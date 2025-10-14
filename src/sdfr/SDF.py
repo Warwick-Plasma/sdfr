@@ -511,7 +511,7 @@ class BlockList:
                 newblock = BlockPointMesh(block)
                 mesh_id_map[newblock.id] = newblock
             elif blocktype == SdfBlockType.RUN_INFO:
-                self.Run_info = _get_run_info(block)
+                newblock = BlockRunInfo(block)
             elif blocktype == SdfBlockType.STATION:
                 sdict = _BlockStation(block, name)
                 self.__dict__.update({"StationBlocks": sdict})
@@ -896,6 +896,38 @@ class Block:
         return self._name
 
 
+class BlockRunInfo(Block, dict):
+    """Run info block"""
+
+    def __init__(self, block):
+        import datetime
+        from datetime import datetime as dtm
+
+        if isinstance(block, Block):
+            block = block._contents
+
+        Block.__init__(self, block)
+
+        utc = datetime.timezone.utc
+
+        h = _c.cast(block.data, _c.POINTER(RunInfo)).contents
+
+        self._dict = {
+            "version": f"{h.version}.{h.revision}.{h.minor_rev}",
+            "commit_id": h.commit_id.decode(),
+            "sha1sum": h.sha1sum.decode(),
+            "compile_machine": h.compile_machine.decode(),
+            "compile_flags": h.compile_flags.decode(),
+            "compile_date": dtm.fromtimestamp(h.compile_date, utc).strftime(
+                "%c"
+            ),
+            "run_date": dtm.fromtimestamp(h.run_date, utc).strftime("%c"),
+            "io_data": dtm.fromtimestamp(h.io_date, utc).strftime("%c"),
+        }
+
+        dict.__init__(self, self._dict)
+
+
 class BlockConstant(Block):
     """Constant block"""
 
@@ -1233,25 +1265,6 @@ def _get_header(h):
     d["restart_flag"] = h.restart_flag
     d["other_domains"] = h.other_domains
     d["station_file"] = h.station_file
-    return d
-
-
-def _get_run_info(block):
-    import datetime
-    from datetime import datetime as dtm
-
-    utc = datetime.timezone.utc
-
-    h = _c.cast(block.data, _c.POINTER(RunInfo)).contents
-    d = {}
-    d["version"] = f"{h.version}.{h.revision}.{h.minor_rev}"
-    d["commit_id"] = h.commit_id.decode()
-    d["sha1sum"] = h.sha1sum.decode()
-    d["compile_machine"] = h.compile_machine.decode()
-    d["compile_flags"] = h.compile_flags.decode()
-    d["compile_date"] = dtm.fromtimestamp(h.compile_date, utc).strftime("%c")
-    d["run_date"] = dtm.fromtimestamp(h.run_date, utc).strftime("%c")
-    d["io_data"] = dtm.fromtimestamp(h.io_date, utc).strftime("%c")
     return d
 
 
