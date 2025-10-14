@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Constants and types for representing the blocks contained in an SDF file."""
+
 import ctypes as _c
 import numpy as _np
 import struct as _struct
@@ -1268,8 +1270,18 @@ class BlockStitched(Block):
                 vid = self._contents.variable_ids[i]
                 if len(vid) > 0:
                     vid = vid.decode()
-                    self._data.append(self._blocklist._block_ids[vid])
+                    if vid in self._blocklist._block_ids:
+                        self._data.append(self._blocklist._block_ids[vid])
+                    else:
+                        self._data.append(None)
+                else:
+                    self._data.append(None)
         return self._data
+
+    @property
+    def grid_id(self):
+        """Associated mesh id"""
+        return self._contents.mesh_id.decode()
 
 
 class BlockStitchedPath(BlockStitched):
@@ -1281,19 +1293,40 @@ class BlockStitchedPath(BlockStitched):
 class BlockStitchedMaterial(BlockStitched):
     """Stitched material block"""
 
-    pass
+    @property
+    def material_names(self):
+        """Material names"""
+        b = self._contents
+        return [b.material_names[i].decode() for i in range(b.ndims)]
 
 
 class BlockStitchedMatvar(BlockStitched):
     """Stitched material variable block"""
 
-    pass
+    @property
+    def material_id(self):
+        """Material ID"""
+        return self._contents.material_id.decode()
 
 
 class BlockStitchedSpecies(BlockStitched):
     """Stitched species block"""
 
-    pass
+    @property
+    def material_id(self):
+        """Material ID"""
+        return self._contents.material_id.decode()
+
+    @property
+    def material_name(self):
+        """Material name"""
+        return self._contents.material_name.decode()
+
+    @property
+    def material_names(self):
+        """Species names"""
+        b = self._contents
+        return [b.material_names[i].decode() for i in range(b.ndims)]
 
 
 class BlockStitchedTensor(BlockStitched):
