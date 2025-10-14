@@ -488,26 +488,31 @@ class BlockList:
                     newblock = BlockStitchedPath(block)
                 else:
                     newblock = BlockStitched(block)
+                mesh_vars.append(newblock)
             elif (
                 blocktype == SdfBlockType.CONTIGUOUS_MATERIAL
                 or blocktype == SdfBlockType.STITCHED_MATERIAL
             ):
                 newblock = BlockStitchedMaterial(block)
+                mesh_vars.append(newblock)
             elif (
                 blocktype == SdfBlockType.CONTIGUOUS_MATVAR
                 or blocktype == SdfBlockType.STITCHED_MATVAR
             ):
                 newblock = BlockStitchedMatvar(block)
+                mesh_vars.append(newblock)
             elif (
                 blocktype == SdfBlockType.CONTIGUOUS_SPECIES
                 or blocktype == SdfBlockType.STITCHED_SPECIES
             ):
                 newblock = BlockStitchedSpecies(block)
+                mesh_vars.append(newblock)
             elif (
                 blocktype == SdfBlockType.CONTIGUOUS_TENSOR
                 or blocktype == SdfBlockType.STITCHED_TENSOR
             ):
                 newblock = BlockStitchedTensor(block)
+                mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.DATABLOCK:
                 newblock = BlockData(block)
             elif blocktype == SdfBlockType.LAGRANGIAN_MESH:
@@ -903,6 +908,7 @@ class Block:
         self._blocklist = block._blocklist
         self._in_file = block.in_file
         self._data = None
+        self._grid = None
 
     def _numpy_from_buffer(self, data, blen):
         buffer_from_memory = _c.pythonapi.PyMemoryView_FromMemory
@@ -1277,6 +1283,11 @@ class BlockStitched(Block):
                 else:
                     self._data.append(None)
         return self._data
+
+    @property
+    def grid(self):
+        """Associated mesh"""
+        return self._grid
 
     @property
     def grid_id(self):
