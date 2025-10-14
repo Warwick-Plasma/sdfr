@@ -439,6 +439,17 @@ class BlockList:
             _c.POINTER(_c.c_char_p),
         ]
         clib.sdf_create_id_array.restype = _c.POINTER(_c.c_char_p)
+        clib.sdf_create_string.argtypes = [
+            _c.c_void_p,
+            _c.c_char_p,
+        ]
+        clib.sdf_create_string.restype = _c.POINTER(_c.c_char_p)
+        clib.sdf_create_string_array.argtypes = [
+            _c.c_void_p,
+            _c.c_int,
+            _c.POINTER(_c.c_char_p),
+        ]
+        clib.sdf_create_string_array.restype = _c.POINTER(_c.c_char_p)
 
         comm = 0
         use_mmap = 0
@@ -649,6 +660,10 @@ class BlockList:
         tmp = self._clib.sdf_create_id(self._handle, values.encode("utf-8"))
         return _c.cast(tmp, _c.c_char_p)
 
+    def _create_string(self, values):
+        tmp = self._clib.sdf_create_string(self._handle, values.encode("utf-8"))
+        return _c.cast(tmp, _c.c_char_p)
+
     def _string_array_ctype(self, values):
         strings = [s.encode("utf-8") for s in values]
         strings = [_c.create_string_buffer(s) for s in strings]
@@ -659,6 +674,13 @@ class BlockList:
     def _create_id_array(self, values):
         values = self._string_array_ctype(values)
         res = self._clib.sdf_create_id_array(self._handle, len(values), values)
+        return res
+
+    def _create_string_array(self, values):
+        values = self._string_array_ctype(values)
+        res = self._clib.sdf_create_string_array(
+            self._handle, len(values), values
+        )
         return res
 
     def _add_preamble(self, id, name, datatype):
