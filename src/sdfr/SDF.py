@@ -1091,7 +1091,12 @@ class BlockList:
     def add_runinfo(self, name, value=None, **kwargs):
         id = None
         args = None
-        if isinstance(name, dict) and value is None:
+        data = None
+        if isinstance(value, Block):
+            id = value.id
+            name = value.name
+            data = value._contents.data
+        elif isinstance(name, dict) and value is None:
             args = name
             name = None
         else:
@@ -1110,9 +1115,101 @@ class BlockList:
         block.blocktype = SdfBlockType.RUN_INFO
         block.AddBlock = BlockRunInfo
 
+        block.data = data
+
         self._add_post(block, args)
 
-    def add_block(self, name, value=None, id=None, **kwargs):
+    def _copy_block(self, block=None, **kwargs):
+        if not block._in_file:
+            return
+
+        _ = block.data
+        kwargs["value"] = block.data
+        kwargs["id"] = block.id
+        kwargs["name"] = block.name
+        kwargs["datatype"] = SdfDataType(block._contents.datatype)
+
+        if isinstance(block, BlockConstant):
+            self._add_constant(**kwargs)
+        elif isinstance(block, BlockNameValue):
+            self._add_namevalue(**kwargs)
+        elif isinstance(block, BlockArray):
+            self._add_array(**kwargs)
+        elif isinstance(block, BlockRunInfo):
+            kwargs["value"] = block
+            self.add_runinfo(**kwargs)
+        elif isinstance(block, BlockData):
+            kwargs["checksum"] = block.checksum
+            kwargs["checksum_type"] = block.checksum_type
+            kwargs["mimetype"] = block.mimetype
+            del kwargs["datatype"]
+            self.add_datablock(**kwargs)
+        elif isinstance(block, BlockPlainVariable):
+            kwargs["mult"] = block.mult
+            kwargs["units"] = block.units
+            kwargs["mesh_id"] = block.grid_id
+            kwargs["stagger"] = block.stagger
+            if hasattr(block, "species_id"):
+                kwargs["species"] = block.species_id
+            self._add_plainvar(**kwargs)
+        elif isinstance(block, BlockPlainMesh):
+            if len(block.data) > 0:
+                kwargs["x"] = block.data[0]
+            if len(block.data) > 1:
+                kwargs["y"] = block.data[1]
+            if len(block.data) > 2:
+                kwargs["z"] = block.data[2]
+            if hasattr(block, "species_id"):
+                kwargs["species"] = block.species_id
+            kwargs["units"] = block.units
+            kwargs["labels"] = block.labels
+            kwargs["geometry"] = block.geometry
+            self._add_mesh(**kwargs)
+        elif isinstance(block, BlockStitched):
+            b = block._contents
+            btype = b.blocktype
+            kwargs["mesh_id"] = b.mesh_id.decode()
+            kwargs["value"] = [d.id if d else "" for d in block.data]
+            kwargs["stagger"] = b.stagger
+            kwargs["btype"] = btype
+
+            if btype in (
+                SdfBlockType.CONTIGUOUS_MATERIAL,
+                SdfBlockType.STITCHED_MATERIAL,
+            ):
+                kwargs["material_names"] = [
+                    b.material_names[i].decode() for i in range(b.ndims)
+                ]
+            elif btype in (
+                SdfBlockType.CONTIGUOUS_MATVAR,
+                SdfBlockType.STITCHED_MATVAR,
+            ):
+                kwargs["material_id"] = b.material_id.decode()
+            elif btype in (
+                SdfBlockType.CONTIGUOUS_SPECIES,
+                SdfBlockType.STITCHED_SPECIES,
+            ):
+                kwargs["material_id"] = b.material_id.decode()
+                kwargs["material_name"] = b.material_name.decode()
+                kwargs["material_names"] = [
+                    b.material_names[i].decode() for i in range(b.ndims)
+                ]
+
+            self.add_stitched(**kwargs)
+        elif isinstance(block, BlockCpuSplit):
+            kwargs["geometry"] = block._contents.geometry
+            self.add_cpu_split(**kwargs)
+        else:
+            print(
+                f'WARNING: block id "{block.id}" of type '
+                f'"{type(block).__name__}" not supported'
+            )
+            return
+
+    def add_block(self, name=None, value=None, id=None, **kwargs):
+        if isinstance(name, Block):
+            return self._copy_block(block=name, value=value, id=id, **kwargs)
+
         add_func = None
         if isinstance(value, dict):
             val = next(iter(value.values()), None)
