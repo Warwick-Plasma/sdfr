@@ -572,6 +572,9 @@ class BlockList:
                 self.__dict__.update({"StationBlocks": sdict})
                 self._block_ids.update({block.id.decode(): sdict})
                 self._block_names.update({block.name.decode(): sdict})
+            elif blocktype == SdfBlockType.CPU_SPLIT:
+                newblock = BlockCpuSplit(block)
+                name = "_" + name
             else:
                 # Block not supported
                 # print(name,SdfBlockType(blocktype).name)
@@ -758,6 +761,33 @@ class BlockList:
         block.ndims = block._data.ndim
         for i in range(block.ndims):
             block.dims[i] = block._data.shape[i]
+        block.data = block._data.ctypes.data_as(_c.c_void_p)
+
+        self._add_post(block)
+
+    def add_cpu_split(self, name, value=(), id=None, datatype=None, geometry=1):
+        from itertools import chain
+
+        if id is None:
+            id = name
+        if datatype is None:
+            if geometry == 4:
+                datatype = SdfDataType.INTEGER8
+            else:
+                datatype = SdfDataType.INTEGER4
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.CPU_SPLIT
+        block.AddBlock = BlockCpuSplit
+
+        dtype = _np_datatypes[datatype]
+        block._data = _np.asarray(list(chain.from_iterable(value)), dtype=dtype)
+        block.ndims = len(value)
+        block.geometry = geometry
+        dims = []
+        for i in range(block.ndims):
+            dims.append(len(value[i]))
+            block.dims[i] = len(value[i])
+
         block.data = block._data.ctypes.data_as(_c.c_void_p)
 
         self._add_post(block)
@@ -1656,6 +1686,54 @@ class BlockStitchedTensor(BlockStitched):
     """Stitched tensor block"""
 
     pass
+
+
+class BlockCpuSplit(Block):
+    """CPU split block"""
+
+    def __init__(self, block):
+        super().__init__(block)
+        nelements = 0
+        if self._contents.geometry in (1, 4):
+            nelements = sum(self.dims)
+        elif self._contents.geometry == 2:
+            nelements, adim = 0, []
+            for dim in self.dims:
+                adim.append(dim)
+                nelements += _np.prod(adim)
+        elif self._contents.geometry == 3:
+            nelements = _np.prod(self.dims)
+        else:
+            raise Exception("CPU split geometry not supported")
+        self._contents.nelements = nelements
+
+    @property
+    def data(self):
+        """Block data contents"""
+        if self._data is None:
+            clib = self._handle._clib
+            clib.sdf_helper_read_data(self._handle, self._contents)
+            nelements = self._contents.nelements
+            blen = _np.dtype(self._datatype).itemsize * nelements
+            array = self._numpy_from_buffer(self._contents.data, blen)
+            if self._contents.geometry in (1, 4):
+                d0, data = 0, []
+                for dim in self.dims:
+                    d1 = d0 + dim
+                    data.append(array[d0:d1])
+                    d0 = d1
+                self._data = tuple(data)
+            elif self._contents.geometry == 2:
+                d0, data, adim = 0, [], []
+                for dim in self.dims:
+                    adim.append(dim)
+                    d1 = d0 + _np.prod(adim)
+                    data.append(array[d0:d1].reshape(adim, order="F"))
+                    d0 = d1
+                self._data = tuple(data)
+            elif self._contents.geometry == 3:
+                self._data = array.reshape(self.dims, order="F")
+        return self._data
 
 
 _re_pattern = _re.compile(r"[^a-zA-Z0-9]")
