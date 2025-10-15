@@ -757,6 +757,35 @@ class BlockList:
 
         self._add_post(block)
 
+    def _add_datablock(
+        self,
+        name,
+        value=(),
+        id=None,
+        checksum=None,
+        checksum_type=None,
+        mimetype=None,
+        datatype=None,
+    ):
+        datatype = SdfDataType.CHARACTER
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.DATABLOCK
+        block.AddBlock = BlockData
+
+        if isinstance(checksum, str):
+            block.checksum = self._create_string(checksum)
+        if isinstance(checksum_type, str):
+            block.checksum_type = self._create_id(checksum_type)
+        if isinstance(mimetype, str):
+            block.mimetype = self._create_id(mimetype)
+
+        block._data = _np.array(value)
+        block.ndims = 0
+        block.nelements = len(value)
+        block.data = block._data.ctypes.data_as(_c.c_void_p)
+
+        self._add_post(block)
+
     def _add_plainvar(
         self,
         name,
@@ -1061,6 +1090,9 @@ class BlockList:
             else:
                 val = arr.flatten()[0]
                 add_func = self._add_plainvar
+        elif isinstance(value, (str, bytes)):
+            val = value
+            add_func = self._add_datablock
         elif value is not None:
             val = value
             add_func = self._add_constant
@@ -1094,11 +1126,12 @@ class BlockList:
             datatype = SdfDataType.REAL4
         elif isinstance(val, float):
             datatype = SdfDataType.REAL8
-        elif isinstance(val, str):
+        elif isinstance(val, str) or isinstance(val, bytes):
             datatype = SdfDataType.CHARACTER
-            if (
-                add_func != self._add_namevalue
-                and add_func != self.add_stitched
+            if add_func not in (
+                self._add_namevalue,
+                self._add_datablock,
+                self.add_stitched,
             ):
                 add_func = None
         else:
