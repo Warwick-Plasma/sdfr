@@ -698,9 +698,12 @@ class BlockList:
         self._set_block_name(id, name)
         return h, block
 
-    def _add_post(self, block):
+    def _add_post(self, block, extra=None):
         if block.AddBlock:
-            newblock = block.AddBlock(block)
+            if extra is None:
+                newblock = block.AddBlock(block)
+            else:
+                newblock = block.AddBlock(block, extra)
         else:
             return
 
@@ -1016,6 +1019,30 @@ class BlockList:
             btype=SdfBlockType.STITCHED_SPECIES,
         )
 
+    def add_runinfo(self, name, value=None, **kwargs):
+        id = None
+        args = None
+        if isinstance(name, dict) and value is None:
+            args = name
+            name = None
+        else:
+            args = value
+
+        if "id" in kwargs:
+            id = kwargs["id"]
+
+        if name is None:
+            name = "Run_info"
+        if id is None:
+            id = name.lower()
+
+        datatype = SdfDataType.CHARACTER
+        h, block = self._add_preamble(id, name, datatype)
+        block.blocktype = SdfBlockType.RUN_INFO
+        block.AddBlock = BlockRunInfo
+
+        self._add_post(block, args)
+
     def add_block(self, name, value=None, id=None, **kwargs):
         add_func = None
         if isinstance(value, dict):
@@ -1167,7 +1194,7 @@ class Block:
 class BlockRunInfo(Block, dict):
     """Run info block"""
 
-    def __init__(self, block):
+    def __init__(self, block, info=None):
         import datetime
         from datetime import datetime as dtm
 
@@ -1175,6 +1202,10 @@ class BlockRunInfo(Block, dict):
             block = block._contents
 
         Block.__init__(self, block)
+
+        if info is not None:
+            self._run_info = self._build_info(info)
+            block.data = _c.cast(_c.byref(self._run_info), _c.c_void_p)
 
         utc = datetime.timezone.utc
 
@@ -1190,10 +1221,41 @@ class BlockRunInfo(Block, dict):
                 "%c"
             ),
             "run_date": dtm.fromtimestamp(h.run_date, utc).strftime("%c"),
-            "io_data": dtm.fromtimestamp(h.io_date, utc).strftime("%c"),
+            "io_date": dtm.fromtimestamp(h.io_date, utc).strftime("%c"),
         }
 
         dict.__init__(self, self._dict)
+
+    def _build_info(self, info):
+        import datetime as dtm
+        import dateutil.parser as dtp
+
+        run_info = RunInfo()
+        fields = [f[0] for f in run_info._fields_]
+        for f in run_info._fields_:
+            if f[1] == _c.c_char_p:
+                setattr(run_info, f[0], "".encode())
+            else:
+                setattr(run_info, f[0], 0)
+        k = "version"
+        if k in info and isinstance(info[k], str):
+            ver = [int(s) for s in info[k].split(".")]
+            info[k] = ver[0]
+            if len(ver) > 1:
+                info["revision"] = ver[1]
+            if len(ver) > 2:
+                info["minor_rev"] = ver[2]
+        for k, v in info.items():
+            if k.endswith("_date"):
+                if isinstance(v, str):
+                    date = dtp.parse(v)
+                    date = date.replace(tzinfo=dtm.timezone.utc)
+                    v = int(date.timestamp())
+                elif isinstance(v, dtm.datetime):
+                    v = int(v.timestamp())
+            if k in fields:
+                setattr(run_info, k, v)
+        return run_info
 
 
 class BlockConstant(Block):
