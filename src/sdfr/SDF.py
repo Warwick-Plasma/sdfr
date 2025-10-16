@@ -270,6 +270,8 @@ SdfBlock._fields_ = [
     ("mmap", _c.c_char_p),
     ("mmap_len", _c.c_int64),
     ("derived", _c.c_bool),
+    ("id_orig", _c.c_char_p),
+    ("name_orig", _c.c_char_p),
 ]
 
 SdfFile._fields_ = [
@@ -475,7 +477,10 @@ class BlockList:
             blocktype = block.blocktype
             newblock = None
             newblock_mid = None
-            name = _get_member_name(block.name)
+            if block.name_orig:
+                name = _get_member_name(block.name_orig)
+            else:
+                name = _get_member_name(block.name)
             if blocktype == SdfBlockType.ARRAY:
                 newblock = BlockArray(block)
             elif blocktype == SdfBlockType.CONSTANT:
@@ -899,8 +904,12 @@ class Block:
 
     def __init__(self, block):
         self._handle = block._handle
-        self._id = block.id.decode()
-        self._name = block.name.decode()
+        if block.id_orig:
+            self._id = block.id_orig.decode()
+            self._name = block.name_orig.decode()
+        else:
+            self._id = block.id.decode()
+            self._name = block.name.decode()
         self._datatype = _np_datatypes[block.datatype_out]
         self._data_length = block.data_length
         self._dims = tuple(block.dims[: block.ndims])
