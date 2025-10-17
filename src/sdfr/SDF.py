@@ -21,6 +21,11 @@ import ctypes as _c
 import numpy as _np
 import struct as _struct
 import re as _re
+import io as _io
+import hashlib as _hashlib
+import tarfile as _tarfile
+import gzip as _gzip
+import os as _os
 from enum import IntEnum as _IntEnum
 from ._loadlib import sdf_lib as _sdf_lib
 from typing import Dict as _Dict
@@ -771,6 +776,11 @@ class BlockList:
         h, block = self._add_preamble(id, name, datatype)
         block.blocktype = SdfBlockType.DATABLOCK
         block.AddBlock = BlockData
+
+        if not checksum:
+            checksum, checksum_type, mimetype, value = _get_checksum_info(
+                value, checksum_type
+            )
 
         if isinstance(checksum, str):
             block.checksum = self._create_string(checksum)
@@ -1710,3 +1720,71 @@ def _new(dict=False, code_name="sdfr", restart=False):
         return blocklist._block_names
 
     return blocklist
+
+
+def get_md5(data):
+    return _hashlib.md5(data).hexdigest()
+
+
+def get_sha(data):
+    sha = _hashlib.sha256()
+    try:
+        with _io.BytesIO(data) as buf:
+            with _tarfile.open(mode="r:*", fileobj=buf) as file:
+                for name in sorted(file.getnames()):
+                    fd = file.extractfile(name)
+                    if fd:
+                        sha.update(fd.read())
+                        fd.close()
+    except Exception:
+        try:
+            sha.update(_gzip.decompress(data))
+        except Exception:
+            sha.update(data)
+    return sha.hexdigest()
+
+
+def _get_tarfile_data(source=None):
+    if not source or not _os.path.exists(source):
+        return source
+    if _os.path.isdir(source):
+        buf = _io.BytesIO()
+        with _tarfile.open("out", "w:gz", fileobj=buf) as tar:
+            tar.add(source)
+        buf.seek(0)
+        return buf.read()
+    else:
+        with open(source, "rb") as fd:
+            return fd.read()
+
+
+def _get_mimetype(data):
+    try:
+        _ = _gzip.decompress(data)
+        return "application/gzip"
+    except Exception:
+        pass
+    try:
+        buf = _io.BytesIO(data)
+        _ = _tarfile.open(mode="r:*", fileobj=buf)
+        return "application/tar"
+    except Exception:
+        return "text/plain"
+
+
+def _get_checksum_info(value=None, checksum_type=None):
+    if not value:
+        return None, None, None, value
+    data = _get_tarfile_data(value)
+    mimetype = _get_mimetype(data)
+    if checksum_type is None:
+        if mimetype == "text/plain":
+            checksum_type = "md5"
+        else:
+            checksum_type = "sha256"
+    if checksum_type == "md5":
+        checksum = get_md5(data)
+    else:
+        checksum = get_sha(data)
+
+    return checksum, checksum_type, mimetype, data
