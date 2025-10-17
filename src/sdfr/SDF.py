@@ -615,14 +615,6 @@ class BlockList:
             self._clib.sdf_close(self._handle)
             self._handle = None
 
-    def write(self, filename):
-        if not self._handle:
-            return
-        for k, b in self._block_ids.items():
-            if isinstance(b, Block) and b._contents.in_file:
-                _ = b.data
-        self._clib.sdf_write(self._handle, filename.encode())
-
     @property
     def Header(self) -> _Dict[str, _Any]:
         """SDF file header"""
@@ -690,595 +682,6 @@ class BlockList:
             self._handle, len(values), values
         )
         return res
-
-    def _add_preamble(self, id, name, datatype):
-        self._clib.sdf_get_next_block(self._handle)
-        h = self._handle.contents
-        h.nblocks += 1
-        h.nblocks_file += 1
-        block = h.current_block.contents
-        block._handle = self._handle
-        block._blocklist = h.blocklist
-        block._data = None
-        block.datatype = datatype
-        block.in_file = 1
-        block.AddBlock = None
-        self._set_block_name(id, name)
-        return h, block
-
-    def _add_post(self, block, extra=None):
-        if block.AddBlock:
-            if extra is None:
-                newblock = block.AddBlock(block)
-            else:
-                newblock = block.AddBlock(block, extra)
-        else:
-            return
-
-        id = block.id.decode()
-        name = block.name.decode()
-        if not block.dont_display:
-            self.__dict__[name] = newblock
-        if block._data is not None:
-            newblock._data = block._data
-        self._block_ids.update({id: newblock})
-        self._block_names.update({name: newblock})
-
-    def _add_constant(self, name, value=0, datatype=None, id=None):
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.CONSTANT
-        block.AddBlock = BlockConstant
-
-        const_value = _struct.pack(_st_datatypes[block.datatype], value)
-        _c.memmove(block.const_value, const_value, 16)
-
-        self._add_post(block)
-
-    def _add_namevalue(self, name, value={}, datatype=None, id=None):
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.NAMEVALUE
-        block.AddBlock = BlockNameValue
-
-        nvalue = len(value)
-        block.ndims = nvalue
-        ctype = _ct_datatypes[block.datatype]
-        if block.datatype == SdfDataType.CHARACTER:
-            vals = self._string_array_ctype(value.values())
-        else:
-            vals = (ctype * nvalue)(*value.values())
-        names = self._string_array_ctype(value.keys())
-        vals = _c.cast(vals, _c.POINTER(_c.c_void_p))
-        self._clib.sdf_set_namevalue(block, names, vals)
-
-        self._add_post(block)
-
-    def _add_array(self, name, value=(), datatype=None, id=None):
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.ARRAY
-        block.AddBlock = BlockArray
-
-        block._data = _np.array(value)
-        block.ndims = block._data.ndim
-        for i in range(block.ndims):
-            block.dims[i] = block._data.shape[i]
-        block.data = block._data.ctypes.data_as(_c.c_void_p)
-
-        self._add_post(block)
-
-    def add_cpu_split(self, name, value=(), id=None, datatype=None, geometry=1):
-        from itertools import chain
-
-        if id is None:
-            id = name
-        if datatype is None:
-            if geometry == 4:
-                datatype = SdfDataType.INTEGER8
-            else:
-                datatype = SdfDataType.INTEGER4
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.CPU_SPLIT
-        block.AddBlock = BlockCpuSplit
-
-        dtype = _np_datatypes[datatype]
-        block._data = _np.asarray(list(chain.from_iterable(value)), dtype=dtype)
-        block.ndims = len(value)
-        block.geometry = geometry
-        dims = []
-        for i in range(block.ndims):
-            dims.append(len(value[i]))
-            block.dims[i] = len(value[i])
-
-        block.data = block._data.ctypes.data_as(_c.c_void_p)
-
-        self._add_post(block)
-
-    def _add_datablock(
-        self,
-        name,
-        value=(),
-        id=None,
-        checksum=None,
-        checksum_type=None,
-        mimetype=None,
-        datatype=None,
-    ):
-        datatype = SdfDataType.CHARACTER
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.DATABLOCK
-        block.AddBlock = BlockData
-
-        if not checksum:
-            checksum, checksum_type, mimetype, value = _get_checksum_info(
-                value, checksum_type
-            )
-
-        if isinstance(checksum, str):
-            block.checksum = self._create_string(checksum)
-        if isinstance(checksum_type, str):
-            block.checksum_type = self._create_id(checksum_type)
-        if isinstance(mimetype, str):
-            block.mimetype = self._create_id(mimetype)
-
-        block._data = _np.array(value)
-        block.ndims = 0
-        block.nelements = len(value)
-        block.data = block._data.ctypes.data_as(_c.c_void_p)
-
-        self._add_post(block)
-
-    def _add_plainvar(
-        self,
-        name,
-        value=(),
-        datatype=None,
-        id=None,
-        mult=None,
-        units=None,
-        mesh_id=None,
-        stagger=None,
-        species=None,
-    ):
-        try:
-            mult = float(mult)
-        except Exception:
-            if mult is not None:
-                print(f"ERROR: unable to use mult parameter, {mult}")
-                return
-        try:
-            stagger = SdfStagger(stagger)
-        except Exception:
-            if stagger is not None:
-                print(f"ERROR: unable to use stagger parameter, {stagger}")
-                return
-        if units is not None and not isinstance(units, str):
-            print(f"ERROR: unable to use units parameter, {units}")
-            return
-        if mesh_id is not None and not isinstance(mesh_id, str):
-            print(f"ERROR: unable to use mesh_id parameter, {mesh_id}")
-            return
-
-        h, block = self._add_preamble(id, name, datatype)
-
-        block._data = _np.array(value, order="F")
-        block.ndims = block._data.ndim
-
-        if block.ndims == 1 and isinstance(species, str):
-            block.blocktype = SdfBlockType.POINT_VARIABLE
-            block.AddBlock = BlockPointVariable
-            block.material_id = self._create_id(species)
-        else:
-            block.blocktype = SdfBlockType.PLAIN_VARIABLE
-            block.AddBlock = BlockPlainVariable
-
-        for i in range(block.ndims):
-            block.dims[i] = block._data.shape[i]
-        block.data = block._data.ctypes.data_as(_c.c_void_p)
-        if mult is not None:
-            block.mult = mult
-        if isinstance(units, str):
-            block.units = self._create_id(units)
-        if isinstance(mesh_id, str):
-            block.mesh_id = self._create_id(mesh_id)
-        if stagger:
-            block.stagger = stagger
-
-        self._clib.sdf_set_defaults(self._handle, block)
-        self._add_post(block)
-
-    def _add_mesh(
-        self,
-        name,
-        value=None,
-        datatype=None,
-        id=None,
-        units=None,
-        labels=None,
-        geometry=None,
-        species=None,
-        **kwargs,
-    ):
-        h, block = self._add_preamble(id, name, datatype)
-
-        keys = ["x", "y", "z"]
-        keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
-        val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
-
-        block._data = [_np.array(kwargs[k], dtype=val.dtype) for k in keys]
-        block._data = [_np.array(row, order="F") for row in block._data]
-        block._data = tuple(block._data)
-        block.ndims = len(block._data)
-        block.ngrids = block.ndims
-        grids = [row.ctypes.data_as(_c.c_void_p) for row in block._data]
-        block.grids = (_c.c_void_p * block.ngrids)(*grids)
-        if block._data[0].ndim == 1:
-            block.blocktype = SdfBlockType.PLAIN_MESH
-            block.AddBlock = BlockPlainMesh
-            for i in range(block.ndims):
-                block.dims[i] = block._data[i].shape[0]
-            if isinstance(species, str):
-                block.blocktype = SdfBlockType.POINT_MESH
-                block.AddBlock = BlockPointMesh
-                block.material_id = self._create_id(species)
-        else:
-            block.blocktype = SdfBlockType.LAGRANGIAN_MESH
-            block.AddBlock = BlockLagrangianMesh
-            for i in range(block.ndims):
-                block.dims[i] = block._data[0].shape[i]
-        if isinstance(units, str):
-            units = (units,)
-        if isinstance(units, (list, tuple)):
-            block.dim_units = self._create_id_array(units)
-        if isinstance(labels, str):
-            labels = (labels,)
-        if isinstance(labels, (list, tuple)):
-            block.dim_labels = self._create_id_array(labels)
-        if isinstance(geometry, str):
-            if geometry == "rz":
-                geometry = SdfGeometry.CYLINDRICAL
-        if isinstance(geometry, int):
-            block.geometry = geometry
-
-        self._clib.sdf_set_defaults(self._handle, block)
-        self._add_post(block)
-
-    def add_stitched(
-        self,
-        name,
-        value={},
-        id=None,
-        mesh_id=None,
-        btype=None,
-        datatype=None,
-        stagger=SdfStagger.HIDDEN0,
-        material_id=None,
-        material_name=None,
-        material_names=None,
-    ):
-        if not isinstance(value, (list, tuple)):
-            print("ERROR: invalid value supplied for stitched block")
-            return
-        if not isinstance(mesh_id, str):
-            found_mesh = None
-            warn = True
-            for val in value:
-                if val in self._block_ids:
-                    tmp = self._block_ids[val]._contents.mesh_id
-                    if isinstance(tmp, bytes):
-                        tmp = tmp.decode()
-                        if (
-                            warn
-                            and found_mesh is not None
-                            and found_mesh != tmp
-                        ):
-                            print(
-                                "WARNING: stitched blocks on different meshes"
-                            )
-                            warn = False
-                        found_mesh = tmp
-                else:
-                    print(
-                        f'WARNING: stitched id "{val}" not found in blocklist'
-                    )
-            if found_mesh is not None:
-                mesh_id = found_mesh
-            else:
-                print("ERROR: no mesh_id supplied for stitched block")
-                return
-        if id is None:
-            id = name
-        if datatype is None:
-            datatype = SdfDataType.NULL
-        h, block = self._add_preamble(id, name, datatype)
-
-        if btype is None:
-            btype = SdfBlockType.STITCHED
-        block.blocktype = btype
-
-        if btype in (
-            SdfBlockType.CONTIGUOUS_TENSOR,
-            SdfBlockType.STITCHED_TENSOR,
-        ):
-            block.AddBlock = BlockStitchedTensor
-        elif btype in (
-            SdfBlockType.CONTIGUOUS_MATERIAL,
-            SdfBlockType.STITCHED_MATERIAL,
-        ):
-            block.AddBlock = BlockStitchedMaterial
-            block.material_names = self._create_string_array(material_names)
-        elif btype in (
-            SdfBlockType.CONTIGUOUS_MATVAR,
-            SdfBlockType.STITCHED_MATVAR,
-        ):
-            block.AddBlock = BlockStitchedMatvar
-            block.material_id = self._create_id(material_id)
-        elif btype in (
-            SdfBlockType.CONTIGUOUS_SPECIES,
-            SdfBlockType.STITCHED_SPECIES,
-        ):
-            block.AddBlock = BlockStitchedSpecies
-            block.material_id = self._create_id(material_id)
-            block.material_name = self._create_string(material_name)
-            block.material_names = self._create_id_array(material_names)
-        else:
-            if stagger in (SdfStagger.HIDDEN0, SdfStagger.HIDDEN2):
-                block.AddBlock = BlockStitchedPath
-            else:
-                block.AddBlock = BlockStitched
-
-        block.stagger = stagger
-        nvalue = len(value)
-        block.ndims = nvalue
-        block.mesh_id = self._create_id(mesh_id)
-        block.variable_ids = self._create_id_array(value)
-        block._blocklist._block_ids = self._block_ids
-
-        self._add_post(block)
-
-    def add_stitched_vector(self, name, value={}, id=None, mesh_id=None):
-        return self.add_stitched(
-            name,
-            value,
-            id,
-            mesh_id,
-            btype=SdfBlockType.STITCHED_TENSOR,
-        )
-
-    def add_stitched_material(
-        self, name, value={}, id=None, mesh_id=None, material_names=None
-    ):
-        return self.add_stitched(
-            name,
-            value,
-            id,
-            mesh_id,
-            material_names=material_names,
-            btype=SdfBlockType.STITCHED_MATERIAL,
-        )
-
-    def add_stitched_matvar(
-        self, name, value={}, id=None, mesh_id=None, material_id=None
-    ):
-        return self.add_stitched(
-            name,
-            value,
-            id,
-            mesh_id,
-            material_id=material_id,
-            btype=SdfBlockType.STITCHED_MATVAR,
-        )
-
-    def add_stitched_species(
-        self,
-        name,
-        value={},
-        id=None,
-        mesh_id=None,
-        material_id=None,
-        material_name=None,
-        material_names=None,
-    ):
-        return self.add_stitched(
-            name,
-            value,
-            id,
-            mesh_id,
-            material_id=material_id,
-            material_name=material_name,
-            material_names=material_names,
-            btype=SdfBlockType.STITCHED_SPECIES,
-        )
-
-    def add_runinfo(self, name, value=None, **kwargs):
-        id = None
-        args = None
-        data = None
-        if isinstance(value, Block):
-            id = value.id
-            name = value.name
-            data = value._contents.data
-        elif isinstance(name, dict) and value is None:
-            args = name
-            name = None
-        else:
-            args = value
-
-        if "id" in kwargs:
-            id = kwargs["id"]
-
-        if name is None:
-            name = "Run_info"
-        if id is None:
-            id = name.lower()
-
-        datatype = SdfDataType.CHARACTER
-        h, block = self._add_preamble(id, name, datatype)
-        block.blocktype = SdfBlockType.RUN_INFO
-        block.AddBlock = BlockRunInfo
-
-        block.data = data
-
-        self._add_post(block, args)
-
-    def _copy_block(self, block=None, **kwargs):
-        if not block._in_file:
-            return
-
-        _ = block.data
-        kwargs["value"] = block.data
-        kwargs["id"] = block.id
-        kwargs["name"] = block.name
-        kwargs["datatype"] = SdfDataType(block._contents.datatype)
-
-        if isinstance(block, BlockConstant):
-            self._add_constant(**kwargs)
-        elif isinstance(block, BlockNameValue):
-            self._add_namevalue(**kwargs)
-        elif isinstance(block, BlockArray):
-            self._add_array(**kwargs)
-        elif isinstance(block, BlockRunInfo):
-            kwargs["value"] = block
-            self.add_runinfo(**kwargs)
-        elif isinstance(block, BlockData):
-            kwargs["checksum"] = block.checksum
-            kwargs["checksum_type"] = block.checksum_type
-            kwargs["mimetype"] = block.mimetype
-            del kwargs["datatype"]
-            self.add_datablock(**kwargs)
-        elif isinstance(block, BlockPlainVariable):
-            kwargs["mult"] = block.mult
-            kwargs["units"] = block.units
-            kwargs["mesh_id"] = block.grid_id
-            kwargs["stagger"] = block.stagger
-            if hasattr(block, "species_id"):
-                kwargs["species"] = block.species_id
-            self._add_plainvar(**kwargs)
-        elif isinstance(block, BlockPlainMesh):
-            if len(block.data) > 0:
-                kwargs["x"] = block.data[0]
-            if len(block.data) > 1:
-                kwargs["y"] = block.data[1]
-            if len(block.data) > 2:
-                kwargs["z"] = block.data[2]
-            if hasattr(block, "species_id"):
-                kwargs["species"] = block.species_id
-            kwargs["units"] = block.units
-            kwargs["labels"] = block.labels
-            kwargs["geometry"] = block.geometry
-            self._add_mesh(**kwargs)
-        elif isinstance(block, BlockStitched):
-            b = block._contents
-            btype = b.blocktype
-            kwargs["mesh_id"] = b.mesh_id.decode()
-            kwargs["value"] = [d.id if d else "" for d in block.data]
-            kwargs["stagger"] = b.stagger
-            kwargs["btype"] = btype
-
-            if btype in (
-                SdfBlockType.CONTIGUOUS_MATERIAL,
-                SdfBlockType.STITCHED_MATERIAL,
-            ):
-                kwargs["material_names"] = [
-                    b.material_names[i].decode() for i in range(b.ndims)
-                ]
-            elif btype in (
-                SdfBlockType.CONTIGUOUS_MATVAR,
-                SdfBlockType.STITCHED_MATVAR,
-            ):
-                kwargs["material_id"] = b.material_id.decode()
-            elif btype in (
-                SdfBlockType.CONTIGUOUS_SPECIES,
-                SdfBlockType.STITCHED_SPECIES,
-            ):
-                kwargs["material_id"] = b.material_id.decode()
-                kwargs["material_name"] = b.material_name.decode()
-                kwargs["material_names"] = [
-                    b.material_names[i].decode() for i in range(b.ndims)
-                ]
-
-            self.add_stitched(**kwargs)
-        elif isinstance(block, BlockCpuSplit):
-            kwargs["geometry"] = block._contents.geometry
-            self.add_cpu_split(**kwargs)
-        else:
-            print(
-                f'WARNING: block id "{block.id}" of type '
-                f'"{type(block).__name__}" not supported'
-            )
-            return
-
-    def add_block(self, name=None, value=None, id=None, **kwargs):
-        if isinstance(name, Block):
-            return self._copy_block(block=name, value=value, id=id, **kwargs)
-
-        add_func = None
-        if isinstance(value, dict):
-            val = next(iter(value.values()), None)
-            add_func = self._add_namevalue
-        elif isinstance(value, (tuple, list, _np.ndarray)):
-            arr = _np.array(value)
-            if arr.ndim == 1:
-                val = value[0]
-                if isinstance(arr[0], str):
-                    add_func = self.add_stitched
-                elif "species" in kwargs or "mesh_id" in kwargs:
-                    add_func = self._add_plainvar
-                else:
-                    add_func = self._add_array
-            else:
-                val = arr.flatten()[0]
-                add_func = self._add_plainvar
-        elif isinstance(value, (str, bytes)):
-            val = value
-            add_func = self._add_datablock
-        elif value is not None:
-            val = value
-            add_func = self._add_constant
-        else:
-            keys = ["x", "y", "z"]
-            keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
-            if len(keys) > 0:
-                val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
-                add_func = self._add_mesh
-                if id is None:
-                    k = "species"
-                    if k in kwargs:
-                        id = f"grid/{kwargs[k]}"
-                    else:
-                        id = "grid"
-
-        if id is None:
-            id = name
-        if id in self._block_ids:
-            print(f'Unable to create block. ID duplicated: "{id}"')
-            return
-
-        datatype = None
-        if isinstance(val, bool):
-            datatype = SdfDataType.LOGICAL
-        elif isinstance(val, _np.int32):
-            datatype = SdfDataType.INTEGER4
-        elif isinstance(val, (int, _np.int64)):
-            datatype = SdfDataType.INTEGER8
-        elif isinstance(val, _np.float32):
-            datatype = SdfDataType.REAL4
-        elif isinstance(val, float):
-            datatype = SdfDataType.REAL8
-        elif isinstance(val, str) or isinstance(val, bytes):
-            datatype = SdfDataType.CHARACTER
-            if add_func not in (
-                self._add_namevalue,
-                self._add_datablock,
-                self.add_stitched,
-            ):
-                add_func = None
-        else:
-            add_func = None
-
-        if add_func:
-            add_func(name, value=value, id=id, datatype=datatype, **kwargs)
-        else:
-            print(f'Block "{id}", unsupported datatype: {type(value)}')
-            return
 
     @property
     def name_dict(self):
@@ -1897,11 +1300,11 @@ def _new(dict=False, code_name="sdfr", restart=False):
     return blocklist
 
 
-def get_md5(data):
+def _get_md5(data):
     return _hashlib.md5(data).hexdigest()
 
 
-def get_sha(data):
+def _get_sha(data):
     sha = _hashlib.sha256()
     try:
         with _io.BytesIO(data) as buf:
@@ -1958,8 +1361,638 @@ def _get_checksum_info(value=None, checksum_type=None):
         else:
             checksum_type = "sha256"
     if checksum_type == "md5":
-        checksum = get_md5(data)
+        checksum = _get_md5(data)
     else:
-        checksum = get_sha(data)
+        checksum = _get_sha(data)
 
     return checksum, checksum_type, mimetype, data
+
+
+def _add_preamble(blocklist, id, name, datatype):
+    blocklist._clib.sdf_get_next_block(blocklist._handle)
+    h = blocklist._handle.contents
+    h.nblocks += 1
+    h.nblocks_file += 1
+    block = h.current_block.contents
+    block._handle = blocklist._handle
+    block._blocklist = h.blocklist
+    block._data = None
+    block.datatype = datatype
+    block.in_file = 1
+    block.AddBlock = None
+    blocklist._set_block_name(id, name)
+    return h, block
+
+
+def _add_post(blocklist, block, extra=None):
+    if block.AddBlock:
+        if extra is None:
+            newblock = block.AddBlock(block)
+        else:
+            newblock = block.AddBlock(block, extra)
+    else:
+        return
+
+    id = block.id.decode()
+    name = block.name.decode()
+    if not block.dont_display:
+        blocklist.__dict__[name] = newblock
+    if block._data is not None:
+        newblock._data = block._data
+    blocklist._block_ids.update({id: newblock})
+    blocklist._block_names.update({name: newblock})
+
+
+def _add_constant(blocklist, name, value=0, datatype=None, id=None):
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.CONSTANT
+    block.AddBlock = BlockConstant
+
+    const_value = _struct.pack(_st_datatypes[block.datatype], value)
+    _c.memmove(block.const_value, const_value, 16)
+
+    _add_post(blocklist, block)
+
+
+def _add_namevalue(blocklist, name, value={}, datatype=None, id=None):
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.NAMEVALUE
+    block.AddBlock = BlockNameValue
+
+    nvalue = len(value)
+    block.ndims = nvalue
+    ctype = _ct_datatypes[block.datatype]
+    if block.datatype == SdfDataType.CHARACTER:
+        vals = blocklist._string_array_ctype(value.values())
+    else:
+        vals = (ctype * nvalue)(*value.values())
+    names = blocklist._string_array_ctype(value.keys())
+    vals = _c.cast(vals, _c.POINTER(_c.c_void_p))
+    blocklist._clib.sdf_set_namevalue(block, names, vals)
+
+    _add_post(blocklist, block)
+
+
+def _add_array(blocklist, name, value=(), datatype=None, id=None):
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.ARRAY
+    block.AddBlock = BlockArray
+
+    block._data = _np.array(value)
+    block.ndims = block._data.ndim
+    for i in range(block.ndims):
+        block.dims[i] = block._data.shape[i]
+    block.data = block._data.ctypes.data_as(_c.c_void_p)
+
+    _add_post(blocklist, block)
+
+
+def _add_cpu_split(
+    blocklist, name, value=(), id=None, datatype=None, geometry=1
+):
+    from itertools import chain
+
+    if not isinstance(blocklist, BlockList):
+        print("ERROR: first argument must be of type BlockList")
+        return
+    if id is None:
+        id = name
+    if datatype is None:
+        if geometry == 4:
+            datatype = SdfDataType.INTEGER8
+        else:
+            datatype = SdfDataType.INTEGER4
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.CPU_SPLIT
+    block.AddBlock = BlockCpuSplit
+
+    dtype = _np_datatypes[datatype]
+    block._data = _np.asarray(list(chain.from_iterable(value)), dtype=dtype)
+    block.ndims = len(value)
+    block.geometry = geometry
+    dims = []
+    for i in range(block.ndims):
+        dims.append(len(value[i]))
+        block.dims[i] = len(value[i])
+
+    block.data = block._data.ctypes.data_as(_c.c_void_p)
+
+    _add_post(blocklist, block)
+
+
+def _add_datablock(
+    blocklist,
+    name,
+    value=(),
+    id=None,
+    checksum=None,
+    checksum_type=None,
+    mimetype=None,
+    datatype=None,
+):
+    datatype = SdfDataType.CHARACTER
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.DATABLOCK
+    block.AddBlock = BlockData
+
+    if not checksum:
+        checksum, checksum_type, mimetype, value = _get_checksum_info(
+            value, checksum_type
+        )
+
+    if isinstance(checksum, str):
+        block.checksum = blocklist._create_string(checksum)
+    if isinstance(checksum_type, str):
+        block.checksum_type = blocklist._create_id(checksum_type)
+    if isinstance(mimetype, str):
+        block.mimetype = blocklist._create_id(mimetype)
+
+    block._data = _np.array(value)
+    block.ndims = 0
+    block.nelements = len(value)
+    block.data = block._data.ctypes.data_as(_c.c_void_p)
+
+    _add_post(blocklist, block)
+
+
+def _add_plainvar(
+    blocklist,
+    name,
+    value=(),
+    datatype=None,
+    id=None,
+    mult=None,
+    units=None,
+    mesh_id=None,
+    stagger=None,
+    species=None,
+):
+    try:
+        mult = float(mult)
+    except Exception:
+        if mult is not None:
+            print(f"ERROR: unable to use mult parameter, {mult}")
+            return
+    try:
+        stagger = SdfStagger(stagger)
+    except Exception:
+        if stagger is not None:
+            print(f"ERROR: unable to use stagger parameter, {stagger}")
+            return
+    if units is not None and not isinstance(units, str):
+        print(f"ERROR: unable to use units parameter, {units}")
+        return
+    if mesh_id is not None and not isinstance(mesh_id, str):
+        print(f"ERROR: unable to use mesh_id parameter, {mesh_id}")
+        return
+
+    h, block = _add_preamble(blocklist, id, name, datatype)
+
+    block._data = _np.array(value, order="F")
+    block.ndims = block._data.ndim
+
+    if block.ndims == 1 and isinstance(species, str):
+        block.blocktype = SdfBlockType.POINT_VARIABLE
+        block.AddBlock = BlockPointVariable
+        block.material_id = blocklist._create_id(species)
+    else:
+        block.blocktype = SdfBlockType.PLAIN_VARIABLE
+        block.AddBlock = BlockPlainVariable
+
+    for i in range(block.ndims):
+        block.dims[i] = block._data.shape[i]
+    block.data = block._data.ctypes.data_as(_c.c_void_p)
+    if mult is not None:
+        block.mult = mult
+    if isinstance(units, str):
+        block.units = blocklist._create_id(units)
+    if isinstance(mesh_id, str):
+        block.mesh_id = blocklist._create_id(mesh_id)
+    if stagger:
+        block.stagger = stagger
+
+    blocklist._clib.sdf_set_defaults(blocklist._handle, block)
+    _add_post(blocklist, block)
+
+
+def _add_mesh(
+    blocklist,
+    name,
+    value=None,
+    datatype=None,
+    id=None,
+    units=None,
+    labels=None,
+    geometry=None,
+    species=None,
+    **kwargs,
+):
+    h, block = _add_preamble(blocklist, id, name, datatype)
+
+    keys = ["x", "y", "z"]
+    keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+    val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+
+    block._data = [_np.array(kwargs[k], dtype=val.dtype) for k in keys]
+    block._data = [_np.array(row, order="F") for row in block._data]
+    block._data = tuple(block._data)
+    block.ndims = len(block._data)
+    block.ngrids = block.ndims
+    grids = [row.ctypes.data_as(_c.c_void_p) for row in block._data]
+    block.grids = (_c.c_void_p * block.ngrids)(*grids)
+    if block._data[0].ndim == 1:
+        block.blocktype = SdfBlockType.PLAIN_MESH
+        block.AddBlock = BlockPlainMesh
+        for i in range(block.ndims):
+            block.dims[i] = block._data[i].shape[0]
+        if isinstance(species, str):
+            block.blocktype = SdfBlockType.POINT_MESH
+            block.AddBlock = BlockPointMesh
+            block.material_id = blocklist._create_id(species)
+    else:
+        block.blocktype = SdfBlockType.LAGRANGIAN_MESH
+        block.AddBlock = BlockLagrangianMesh
+        for i in range(block.ndims):
+            block.dims[i] = block._data[0].shape[i]
+    if isinstance(units, str):
+        units = (units,)
+    if isinstance(units, (list, tuple)):
+        block.dim_units = blocklist._create_id_array(units)
+    if isinstance(labels, str):
+        labels = (labels,)
+    if isinstance(labels, (list, tuple)):
+        block.dim_labels = blocklist._create_id_array(labels)
+    if isinstance(geometry, str):
+        if geometry == "rz":
+            geometry = SdfGeometry.CYLINDRICAL
+    if isinstance(geometry, int):
+        block.geometry = geometry
+
+    blocklist._clib.sdf_set_defaults(blocklist._handle, block)
+    _add_post(blocklist, block)
+
+
+def _add_stitched(
+    blocklist,
+    name,
+    value={},
+    id=None,
+    mesh_id=None,
+    btype=None,
+    datatype=None,
+    stagger=SdfStagger.HIDDEN0,
+    material_id=None,
+    material_name=None,
+    material_names=None,
+):
+    if not isinstance(blocklist, BlockList):
+        print("ERROR: first argument must be of type BlockList")
+        return
+    if not isinstance(value, (list, tuple)):
+        print("ERROR: invalid value supplied for stitched block")
+        return
+    if not isinstance(mesh_id, str):
+        found_mesh = None
+        warn = True
+        for val in value:
+            if val in blocklist._block_ids:
+                tmp = blocklist._block_ids[val]._contents.mesh_id
+                if isinstance(tmp, bytes):
+                    tmp = tmp.decode()
+                    if warn and found_mesh is not None and found_mesh != tmp:
+                        print("WARNING: stitched blocks on different meshes")
+                        warn = False
+                    found_mesh = tmp
+            else:
+                print(f'WARNING: stitched id "{val}" not found in blocklist')
+        if found_mesh is not None:
+            mesh_id = found_mesh
+        else:
+            print("ERROR: no mesh_id supplied for stitched block")
+            return
+    if id is None:
+        id = name
+    if datatype is None:
+        datatype = SdfDataType.NULL
+    h, block = _add_preamble(blocklist, id, name, datatype)
+
+    if btype is None:
+        btype = SdfBlockType.STITCHED
+    block.blocktype = btype
+
+    if btype in (
+        SdfBlockType.CONTIGUOUS_TENSOR,
+        SdfBlockType.STITCHED_TENSOR,
+    ):
+        block.AddBlock = BlockStitchedTensor
+    elif btype in (
+        SdfBlockType.CONTIGUOUS_MATERIAL,
+        SdfBlockType.STITCHED_MATERIAL,
+    ):
+        block.AddBlock = BlockStitchedMaterial
+        block.material_names = blocklist._create_string_array(material_names)
+    elif btype in (
+        SdfBlockType.CONTIGUOUS_MATVAR,
+        SdfBlockType.STITCHED_MATVAR,
+    ):
+        block.AddBlock = BlockStitchedMatvar
+        block.material_id = blocklist._create_id(material_id)
+    elif btype in (
+        SdfBlockType.CONTIGUOUS_SPECIES,
+        SdfBlockType.STITCHED_SPECIES,
+    ):
+        block.AddBlock = BlockStitchedSpecies
+        block.material_id = blocklist._create_id(material_id)
+        block.material_name = blocklist._create_string(material_name)
+        block.material_names = blocklist._create_id_array(material_names)
+    else:
+        if stagger in (SdfStagger.HIDDEN0, SdfStagger.HIDDEN2):
+            block.AddBlock = BlockStitchedPath
+        else:
+            block.AddBlock = BlockStitched
+
+    block.stagger = stagger
+    nvalue = len(value)
+    block.ndims = nvalue
+    block.mesh_id = blocklist._create_id(mesh_id)
+    block.variable_ids = blocklist._create_id_array(value)
+    block._blocklist._block_ids = blocklist._block_ids
+
+    _add_post(blocklist, block)
+
+
+def _add_stitched_vector(blocklist, name, value={}, id=None, mesh_id=None):
+    return _add_stitched(
+        blocklist,
+        name,
+        value,
+        id,
+        mesh_id,
+        btype=SdfBlockType.STITCHED_TENSOR,
+    )
+
+
+def _add_stitched_material(
+    blocklist, name, value={}, id=None, mesh_id=None, material_names=None
+):
+    return _add_stitched(
+        blocklist,
+        name,
+        value,
+        id,
+        mesh_id,
+        material_names=material_names,
+        btype=SdfBlockType.STITCHED_MATERIAL,
+    )
+
+
+def _add_stitched_matvar(
+    blocklist, name, value={}, id=None, mesh_id=None, material_id=None
+):
+    return _add_stitched(
+        blocklist,
+        name,
+        value,
+        id,
+        mesh_id,
+        material_id=material_id,
+        btype=SdfBlockType.STITCHED_MATVAR,
+    )
+
+
+def _add_stitched_species(
+    blocklist,
+    name,
+    value={},
+    id=None,
+    mesh_id=None,
+    material_id=None,
+    material_name=None,
+    material_names=None,
+):
+    return _add_stitched(
+        blocklist,
+        name,
+        value,
+        id,
+        mesh_id,
+        material_id=material_id,
+        material_name=material_name,
+        material_names=material_names,
+        btype=SdfBlockType.STITCHED_SPECIES,
+    )
+
+
+def _add_runinfo(blocklist, name, value=None, **kwargs):
+    if not isinstance(blocklist, BlockList):
+        print("ERROR: first argument must be of type BlockList")
+        return
+    id = None
+    args = None
+    data = None
+    if isinstance(value, Block):
+        id = value.id
+        name = value.name
+        data = value._contents.data
+    elif isinstance(name, dict) and value is None:
+        args = name
+        name = None
+    else:
+        args = value
+
+    if "id" in kwargs:
+        id = kwargs["id"]
+
+    if name is None:
+        name = "Run_info"
+    if id is None:
+        id = name.lower()
+
+    datatype = SdfDataType.CHARACTER
+    h, block = _add_preamble(blocklist, id, name, datatype)
+    block.blocktype = SdfBlockType.RUN_INFO
+    block.AddBlock = BlockRunInfo
+
+    block.data = data
+
+    _add_post(blocklist, block, args)
+
+
+def _copy_block(blocklist, block=None, **kwargs):
+    if not block._in_file:
+        return
+
+    _ = block.data
+    kwargs["value"] = block.data
+    kwargs["id"] = block.id
+    kwargs["name"] = block.name
+    kwargs["datatype"] = SdfDataType(block._contents.datatype)
+
+    if isinstance(block, BlockConstant):
+        _add_constant(blocklist, **kwargs)
+    elif isinstance(block, BlockNameValue):
+        _add_namevalue(blocklist, **kwargs)
+    elif isinstance(block, BlockArray):
+        _add_array(blocklist, **kwargs)
+    elif isinstance(block, BlockRunInfo):
+        kwargs["value"] = block
+        _add_runinfo(blocklist, **kwargs)
+    elif isinstance(block, BlockData):
+        kwargs["checksum"] = block.checksum
+        kwargs["checksum_type"] = block.checksum_type
+        kwargs["mimetype"] = block.mimetype
+        del kwargs["datatype"]
+        _add_datablock(blocklist, **kwargs)
+    elif isinstance(block, BlockPlainVariable):
+        kwargs["mult"] = block.mult
+        kwargs["units"] = block.units
+        kwargs["mesh_id"] = block.grid_id
+        kwargs["stagger"] = block.stagger
+        if hasattr(block, "species_id"):
+            kwargs["species"] = block.species_id
+        _add_plainvar(blocklist, **kwargs)
+    elif isinstance(block, BlockPlainMesh):
+        if len(block.data) > 0:
+            kwargs["x"] = block.data[0]
+        if len(block.data) > 1:
+            kwargs["y"] = block.data[1]
+        if len(block.data) > 2:
+            kwargs["z"] = block.data[2]
+        if hasattr(block, "species_id"):
+            kwargs["species"] = block.species_id
+        kwargs["units"] = block.units
+        kwargs["labels"] = block.labels
+        kwargs["geometry"] = block.geometry
+        _add_mesh(blocklist, **kwargs)
+    elif isinstance(block, BlockStitched):
+        b = block._contents
+        btype = b.blocktype
+        kwargs["mesh_id"] = b.mesh_id.decode()
+        kwargs["value"] = [d.id if d else "" for d in block.data]
+        kwargs["stagger"] = b.stagger
+        kwargs["btype"] = btype
+
+        if btype in (
+            SdfBlockType.CONTIGUOUS_MATERIAL,
+            SdfBlockType.STITCHED_MATERIAL,
+        ):
+            kwargs["material_names"] = [
+                b.material_names[i].decode() for i in range(b.ndims)
+            ]
+        elif btype in (
+            SdfBlockType.CONTIGUOUS_MATVAR,
+            SdfBlockType.STITCHED_MATVAR,
+        ):
+            kwargs["material_id"] = b.material_id.decode()
+        elif btype in (
+            SdfBlockType.CONTIGUOUS_SPECIES,
+            SdfBlockType.STITCHED_SPECIES,
+        ):
+            kwargs["material_id"] = b.material_id.decode()
+            kwargs["material_name"] = b.material_name.decode()
+            kwargs["material_names"] = [
+                b.material_names[i].decode() for i in range(b.ndims)
+            ]
+
+        _add_stitched(blocklist, **kwargs)
+    elif isinstance(block, BlockCpuSplit):
+        kwargs["geometry"] = block._contents.geometry
+        _add_cpu_split(blocklist, **kwargs)
+    else:
+        print(
+            f'WARNING: block id "{block.id}" of type '
+            f'"{type(block).__name__}" not supported'
+        )
+        return
+
+
+def _add_block(blocklist, name=None, value=None, id=None, **kwargs):
+    if not isinstance(blocklist, BlockList):
+        print("ERROR: first argument must be of type BlockList")
+        return
+    if isinstance(name, Block):
+        return _copy_block(blocklist, block=name, value=value, id=id, **kwargs)
+
+    add_func = None
+    if isinstance(value, dict):
+        val = next(iter(value.values()), None)
+        add_func = _add_namevalue
+    elif isinstance(value, (tuple, list, _np.ndarray)):
+        arr = _np.array(value)
+        if arr.ndim == 1:
+            val = value[0]
+            if isinstance(arr[0], str):
+                add_func = _add_stitched
+            elif "species" in kwargs or "mesh_id" in kwargs:
+                add_func = _add_plainvar
+            else:
+                add_func = _add_array
+        else:
+            val = arr.flatten()[0]
+            add_func = _add_plainvar
+    elif isinstance(value, (str, bytes)):
+        val = value
+        add_func = _add_datablock
+    elif value is not None:
+        val = value
+        add_func = _add_constant
+    else:
+        keys = ["x", "y", "z"]
+        keys = [k for k in keys if k in kwargs and kwargs[k] is not None]
+        if len(keys) > 0:
+            val = _np.concatenate([kwargs[k] for k in keys]).flatten()[0]
+            add_func = _add_mesh
+            if id is None:
+                k = "species"
+                if k in kwargs:
+                    id = f"grid/{kwargs[k]}"
+                else:
+                    id = "grid"
+
+    if id is None:
+        id = name
+    if id in blocklist._block_ids:
+        print(f'Unable to create block. ID duplicated: "{id}"')
+        return
+
+    datatype = None
+    if isinstance(val, bool):
+        datatype = SdfDataType.LOGICAL
+    elif isinstance(val, _np.int32):
+        datatype = SdfDataType.INTEGER4
+    elif isinstance(val, (int, _np.int64)):
+        datatype = SdfDataType.INTEGER8
+    elif isinstance(val, _np.float32):
+        datatype = SdfDataType.REAL4
+    elif isinstance(val, float):
+        datatype = SdfDataType.REAL8
+    elif isinstance(val, str) or isinstance(val, bytes):
+        datatype = SdfDataType.CHARACTER
+        if add_func not in (
+            _add_namevalue,
+            _add_datablock,
+            _add_stitched,
+        ):
+            add_func = None
+    else:
+        add_func = None
+
+    if add_func:
+        add_func(
+            blocklist, name, value=value, id=id, datatype=datatype, **kwargs
+        )
+    else:
+        print(f'Block "{id}", unsupported datatype: {type(value)}')
+        return
+
+
+def _write(blocklist, filename):
+    if not isinstance(blocklist, BlockList):
+        print("ERROR: first argument must be of type BlockList")
+        return
+    if not blocklist._handle:
+        return
+    for k, b in blocklist._block_ids.items():
+        if isinstance(b, Block) and b._contents.in_file:
+            _ = b.data
+    blocklist._clib.sdf_write(blocklist._handle, filename.encode())
