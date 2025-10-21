@@ -845,8 +845,8 @@ def plot1d(
     # This is an attempt to get both axes to use the same scale
     # I'm not at all confident that it always does the right thing
     if xscale == 0 and yscale == 0:
-        xlen = max(abs(X[0]), abs(X[-1]))
-        ylen = max(abs(Y[0]), abs(Y[-1]))
+        xlen = max(X) - min(X)
+        ylen = max(Y) - min(Y)
         ratio1 = ylen / xlen
         ratio2 = xlen / ylen
         if ratio1 >= 1 and ratio1 < 1e3:
@@ -857,14 +857,14 @@ def plot1d(
             yscale = ylen
 
     if xscale == 0:
-        length = max(abs(X[0]), abs(X[-1]))
-        mult_x, sym_x = get_si_prefix(length)
+        xlen = max(X) - min(X)
+        mult_x, sym_x = get_si_prefix(xlen)
     else:
         mult_x, sym_x = get_si_prefix(xscale)
 
     if yscale == 0:
-        length = max(abs(Y[0]), abs(Y[-1]))
-        mult_y, sym_y = get_si_prefix(length)
+        ylen = max(Y) - min(Y)
+        mult_y, sym_y = get_si_prefix(ylen)
     else:
         mult_y, sym_y = get_si_prefix(yscale)
 
