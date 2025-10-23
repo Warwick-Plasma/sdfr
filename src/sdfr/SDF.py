@@ -121,7 +121,6 @@ _np_datatypes = [
     _np.float64,
     _np.longdouble,
     _np.byte,
-    _np.int32,
     bool,
     0,
 ]
@@ -1956,7 +1955,7 @@ def _add_block(blocklist, name=None, value=None, id=None, **kwargs):
         return
 
     datatype = None
-    if isinstance(val, bool):
+    if isinstance(val, (bool, _np.bool)):
         datatype = SdfDataType.LOGICAL
     elif isinstance(val, _np.int32):
         datatype = SdfDataType.INTEGER4
