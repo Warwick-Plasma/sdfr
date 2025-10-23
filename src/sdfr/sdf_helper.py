@@ -1129,24 +1129,24 @@ def plot_path(
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
     if isvar:
+        k = "vmin"
+        k1 = "vrange"
+        if k in kwargs:
+            vmin = kwargs[k]
+        elif k1 in kwargs:
+            vmin = kwargs[k1][0]
+        else:
+            vmin = c.min()
+
+        k = "vmax"
+        if k in kwargs:
+            vmax = kwargs[k]
+        elif k1 in kwargs:
+            vmax = kwargs[k1][1]
+        else:
+            vmax = c.max()
+
         if not hold or plot_path.norm_values is None:
-            k = "vmin"
-            k1 = "vrange"
-            if k in kwargs:
-                vmin = kwargs[k]
-            elif k1 in kwargs:
-                vmin = kwargs[k1][0]
-            else:
-                vmin = c.min()
-
-            k = "vmax"
-            if k in kwargs:
-                vmax = kwargs[k]
-            elif k1 in kwargs:
-                vmax = kwargs[k1][1]
-            else:
-                vmax = c.max()
-
             plot_path.norm_values = plt.Normalize(vmin, vmax)
 
     im = None
