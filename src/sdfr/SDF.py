@@ -547,8 +547,9 @@ class BlockList:
                 blocktype == SdfBlockType.PLAIN_DERIVED
                 or blocktype == SdfBlockType.PLAIN_VARIABLE
             ):
-                newblock = BlockPlainVariable(block)
-                mesh_vars.append(newblock)
+                if block.datatype > 0:
+                    newblock = BlockPlainVariable(block)
+                    mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.PLAIN_MESH:
                 if block.datatype_out != 0:
                     newblock = BlockPlainMesh(block)
@@ -559,8 +560,9 @@ class BlockList:
                 blocktype == SdfBlockType.POINT_DERIVED
                 or blocktype == SdfBlockType.POINT_VARIABLE
             ):
-                newblock = BlockPointVariable(block)
-                mesh_vars.append(newblock)
+                if block.datatype > 0:
+                    newblock = BlockPointVariable(block)
+                    mesh_vars.append(newblock)
             elif blocktype == SdfBlockType.POINT_MESH:
                 newblock = BlockPointMesh(block)
                 mesh_id_map[newblock.id] = newblock
